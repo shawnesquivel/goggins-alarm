@@ -9,6 +9,7 @@ import ProjectSetupScreen from "./ProjectSetupScreen";
 import TimerSetupScreen from "./TimerSetupScreen";
 import StartSessionScreen from "./StartSessionScreen";
 import TrialScreen from "./TrialScreen";
+import { useRouter } from "expo-router";
 
 export default function Onboarding() {
   const {
@@ -19,6 +20,7 @@ export default function Onboarding() {
     previousScreen,
     completeOnboarding,
   } = useOnboarding();
+  const router = useRouter();
 
   // Render appropriate screen based on type
   const renderScreen = () => {
@@ -64,7 +66,12 @@ export default function Onboarding() {
             screen={currentScreen}
             currentStep={currentScreenIndex}
             totalSteps={totalScreens}
-            onNext={completeOnboarding}
+            onNext={() => {
+              // Don't do any navigation here - it's handled in the StartSessionScreen component
+              console.log(
+                "[Onboarding] Start session complete - navigation handled in component"
+              );
+            }}
             onBack={previousScreen}
           />
         );

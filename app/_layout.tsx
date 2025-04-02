@@ -5,7 +5,7 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack, Slot } from "expo-router";
+import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import "react-native-reanimated";
@@ -48,6 +48,8 @@ export default function RootLayout() {
     return null;
   }
 
+  // Wrap with providers and directly render the RootLayoutNav
+  // No navigation decision-making in this component
   return (
     <OnboardingProvider>
       <PomodoroProvider>
@@ -76,7 +78,6 @@ function RootLayoutNav() {
           name="onboarding"
           options={{ presentation: "fullScreenModal" }}
         />
-        <Stack.Screen name="index" redirect={true} />
       </Stack>
     </ThemeProvider>
   );

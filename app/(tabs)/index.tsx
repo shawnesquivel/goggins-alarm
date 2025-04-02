@@ -12,37 +12,29 @@ import {
   Alert,
 } from "react-native";
 import { usePomodoro } from "@/contexts/AlarmContext";
-import { useOnboarding } from "@/contexts/OnboardingContext";
-import { TimerStatus } from "@/types/alarm";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
+import { TimerStatus } from "@/types/alarm";
 
 export default function TimerScreen() {
   const router = useRouter();
-  const { isOnboarding } = useOnboarding();
-  const hasNavigated = useRef(false);
+  // REMOVED: Onboarding context usage moved to _layout
+  // const { isOnboarding } = useOnboarding();
+  // const [isLoading, setIsLoading] = useState(true);
+  // const hasNavigated = useRef(false);
 
-  // Instead of redirecting immediately, set up manual navigation
-  // This is a temporary solution to handle the app startup
-  const triggerOnboarding = () => {
-    // Only navigate if we haven't already tried to navigate
-    if (isOnboarding && !hasNavigated.current) {
-      hasNavigated.current = true;
-      // Use setTimeout to ensure root layout is mounted
-      setTimeout(() => {
-        try {
-          router.navigate("/onboarding");
-        } catch (e) {
-          console.error("Navigation error:", e);
-        }
-      }, 500);
-    }
-  };
+  // REMOVED: triggerOnboarding function
+  // const triggerOnboarding = () => { ... };
 
-  // Use this to check if we should show onboarding
-  useEffect(() => {
-    triggerOnboarding();
-  }, []);
+  // REMOVED: useEffect for onboarding check
+  // useEffect(() => {
+  //   console.log("[TimerScreen] Mount useEffect: Triggering onboarding check.");
+  //   if (isOnboarding && !hasNavigated.current) {
+  //     ...
+  //   } else {
+  //     setIsLoading(false);
+  //   }
+  // }, []);
 
   // Get context data
   const {
@@ -214,7 +206,8 @@ export default function TimerScreen() {
     </View>
   );
 
-  // Regular screen UI
+  // Main screen UI
+  console.log("[TimerScreen] Rendering main UI.");
   return isFullScreen ? (
     <FullScreenTimer />
   ) : (

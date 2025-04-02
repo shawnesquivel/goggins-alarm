@@ -8,13 +8,18 @@ export default function OnboardingScreen() {
   const { isOnboarding } = useOnboarding();
   const router = useRouter();
 
-  // If onboarding is complete, redirect to main app
-  React.useEffect(() => {
-    if (!isOnboarding) {
-      router.replace("/");
-    }
-  }, [isOnboarding, router]);
+  console.log("[OnboardingScreen] Rendering. isOnboarding:", isOnboarding);
 
+  // Only render content if onboarding is actually active
+  if (!isOnboarding) {
+    console.log(
+      "[OnboardingScreen] Not rendering content because isOnboarding is false."
+    );
+    return null;
+  }
+
+  // Render the onboarding UI
+  console.log("[OnboardingScreen] Rendering Onboarding component.");
   return (
     <View style={styles.container}>
       <Onboarding />

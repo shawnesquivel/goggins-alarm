@@ -27,6 +27,8 @@ export interface TimerSettings {
   breakDuration: number; // in minutes
   autoStartBreak: boolean;
   autoStartNextFocus: boolean;
+  soundEnabled?: boolean;
+  notificationsEnabled?: boolean;
 }
 
 export interface Tag {

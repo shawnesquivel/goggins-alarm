@@ -12,6 +12,7 @@ import {
   Platform,
 } from "react-native";
 import { OnboardingScreen as OnboardingScreenType } from "@/contexts/OnboardingContext";
+import FormattedText from "./FormattedText";
 
 interface OnboardingScreenProps {
   screen: OnboardingScreenType;
@@ -21,6 +22,7 @@ interface OnboardingScreenProps {
   onBack?: () => void;
   onSkip?: () => void;
   children?: React.ReactNode;
+  disableNext?: boolean;
 }
 
 const { width, height } = Dimensions.get("window");
@@ -33,6 +35,7 @@ export default function OnboardingScreen({
   onBack,
   onSkip,
   children,
+  disableNext,
 }: OnboardingScreenProps) {
   const showBackButton = currentStep > 0 && onBack;
 
@@ -52,17 +55,33 @@ export default function OnboardingScreen({
           </Text>
         </View>
 
+        {/* Tailwind Test Section */}
+        <View className="bg-primary m-4 p-4 rounded-lg">
+          <Text className="text-white font-pbold text-center">
+            Hello Tailwind! If this looks styled, Tailwind is working!
+          </Text>
+          <Text className="text-red-500 font-pbold text-center">
+            Hello Tailwind! If this looks styled, Tailwind is working!
+          </Text>
+          <Text className="text-blue-500 font-pbold text-center">
+            Hello Tailwind! If this looks styled, Tailwind is working!
+          </Text>
+        </View>
+
         {/* Main content */}
         <View style={styles.content}>
           <View style={styles.titleContainer}>
-            <Text style={styles.title}>{screen.title}</Text>
+            <FormattedText text={screen.title} style={styles.title} />
             {screen.subtitle && (
-              <Text style={styles.subtitle}>{screen.subtitle}</Text>
+              <FormattedText text={screen.subtitle} style={styles.subtitle} />
             )}
           </View>
 
           {screen.description && (
-            <Text style={styles.description}>{screen.description}</Text>
+            <FormattedText
+              text={screen.description}
+              style={styles.description}
+            />
           )}
 
           <View style={styles.childrenContainer}>{children}</View>
@@ -80,8 +99,20 @@ export default function OnboardingScreen({
               <View style={styles.emptySpace} />
             )}
 
-            <TouchableOpacity style={styles.nextButton} onPress={onNext}>
-              <Text style={styles.nextButtonText}>
+            <TouchableOpacity
+              style={[
+                styles.nextButton,
+                disableNext && styles.disabledNextButton,
+              ]}
+              onPress={onNext}
+              disabled={disableNext}
+            >
+              <Text
+                style={[
+                  styles.nextButtonText,
+                  disableNext && styles.disabledNextButtonText,
+                ]}
+              >
                 {screen.action || "NEXT"}
               </Text>
             </TouchableOpacity>
@@ -128,7 +159,7 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 8,
+    marginBottom: 25,
   },
   subtitle: {
     fontSize: 18,
@@ -169,10 +200,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     borderRadius: 4,
   },
+  disabledNextButton: {
+    backgroundColor: "#999",
+  },
   nextButtonText: {
     fontSize: 16,
     fontWeight: "500",
     color: "#fff",
+  },
+  disabledNextButtonText: {
+    color: "#ddd",
   },
   emptySpace: {
     width: 80,

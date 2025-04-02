@@ -72,6 +72,8 @@ const DEFAULT_SETTINGS: TimerSettings = {
   breakDuration: 5,
   autoStartBreak: true,
   autoStartNextFocus: false,
+  soundEnabled: true,
+  notificationsEnabled: true,
 };
 
 // Default tags

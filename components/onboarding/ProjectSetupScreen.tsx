@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -29,11 +29,12 @@ export default function ProjectSetupScreen({
   onNext,
   onBack,
 }: ProjectSetupScreenProps) {
-  const { addProject } = usePomodoro();
+  const { projects, addProject } = usePomodoro();
   const [projectName, setProjectName] = useState("");
   const [projectGoal, setProjectGoal] = useState("");
   const [selectedColor, setSelectedColor] = useState("#4A90E2");
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true);
+  const [hasProjects, setHasProjects] = useState(projects.length > 0);
 
   const colorOptions = [
     "#4A90E2", // Blue
@@ -45,6 +46,10 @@ export default function ProjectSetupScreen({
     "#BD10E0", // Pink
     "#000000", // Black
   ];
+
+  useEffect(() => {
+    setHasProjects(projects.length > 0);
+  }, [projects]);
 
   const handleCreateProject = () => {
     if (projectName.trim()) {
@@ -58,7 +63,6 @@ export default function ProjectSetupScreen({
       setProjectName("");
       setProjectGoal("");
       setShowForm(false);
-      onNext();
     }
   };
 
@@ -69,28 +73,18 @@ export default function ProjectSetupScreen({
       totalSteps={totalSteps}
       onNext={onNext}
       onBack={onBack}
+      disableNext={!hasProjects}
     >
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={{ flex: 1 }}
+        style={styles.containerAvoidingView}
       >
         <ScrollView
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={styles.scrollContentContainer}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          {!showForm ? (
-            <View style={styles.emptyStateContainer}>
-              <Text style={styles.emptyText}>
-                No categories yet. Add your first category
-              </Text>
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setShowForm(true)}
-              >
-                <Text style={styles.addButtonText}>+ Add Project</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
+          {showForm ? (
             <View style={styles.formContainer}>
               <Text style={styles.formTitle}>ADD A PROJECT</Text>
 
@@ -107,7 +101,7 @@ export default function ProjectSetupScreen({
               <Text style={styles.inputLabel}>Project Goal</Text>
               <TextInput
                 style={[styles.input, styles.multilineInput]}
-                placeholder="Describe your big goal for this project"
+                placeholder="e.g. I want to achieve [X Goal] by Dec 31, 2026"
                 value={projectGoal}
                 onChangeText={setProjectGoal}
                 multiline
@@ -117,34 +111,60 @@ export default function ProjectSetupScreen({
                 onSubmitEditing={Keyboard.dismiss}
               />
 
-              {/* Keyboard dismiss button */}
-              <TouchableOpacity
-                style={styles.dismissButton}
-                onPress={Keyboard.dismiss}
-              >
-                <Text style={styles.dismissButtonText}>Done</Text>
-              </TouchableOpacity>
-
               <Text style={styles.inputLabel}>Project Color</Text>
-              <View style={styles.colorContainer}>
-                {colorOptions.map((color) => (
-                  <TouchableOpacity
-                    key={color}
-                    style={[
-                      styles.colorOption,
-                      { backgroundColor: color },
-                      selectedColor === color && styles.selectedColor,
-                    ]}
-                    onPress={() => setSelectedColor(color)}
-                  />
-                ))}
-              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.colorScrollView}
+              >
+                <View style={styles.colorContainer}>
+                  {colorOptions.map((color) => (
+                    <TouchableOpacity
+                      key={color}
+                      style={[
+                        styles.colorOption,
+                        { backgroundColor: color },
+                        selectedColor === color && styles.selectedColor,
+                      ]}
+                      onPress={() => setSelectedColor(color)}
+                    />
+                  ))}
+                </View>
+              </ScrollView>
 
               <TouchableOpacity
-                style={styles.saveButton}
+                style={[
+                  styles.saveButton,
+                  !projectName.trim() && styles.disabledButton,
+                ]}
                 onPress={handleCreateProject}
+                disabled={!projectName.trim()}
               >
                 <Text style={styles.saveButtonText}>SAVE PROJECT</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.projectListContainer}>
+              <Text style={styles.listTitle}>Your Focus Areas</Text>
+              {projects.map((project) => (
+                <View key={project.id} style={styles.projectItem}>
+                  <View
+                    style={[
+                      styles.projectColorDot,
+                      { backgroundColor: project.color || "#ccc" },
+                    ]}
+                  />
+                  <Text style={styles.projectNameText}>{project.name}</Text>
+                </View>
+              ))}
+              <TouchableOpacity
+                style={styles.addButton}
+                onPress={() => {
+                  setSelectedColor("#4A90E2");
+                  setShowForm(true);
+                }}
+              >
+                <Text style={styles.addButtonText}>+ Add Another Project</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -155,10 +175,54 @@ export default function ProjectSetupScreen({
 }
 
 const styles = StyleSheet.create({
+  containerAvoidingView: {
+    flex: 1,
+  },
+  scrollContentContainer: {
+    flexGrow: 1,
+    justifyContent: "center",
+    paddingBottom: 30,
+  },
   emptyStateContainer: {
     alignItems: "center",
     justifyContent: "center",
     marginVertical: 30,
+  },
+  projectListContainer: {
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 30,
+  },
+  listTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 20,
+    color: "#333",
+  },
+  projectItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginBottom: 10,
+    width: "90%",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 1,
+    elevation: 1,
+  },
+  projectColorDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 10,
+  },
+  projectNameText: {
+    fontSize: 16,
+    color: "#333",
   },
   emptyText: {
     fontSize: 16,
@@ -167,6 +231,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   addButton: {
+    marginTop: 20,
     paddingVertical: 10,
     paddingHorizontal: 20,
   },
@@ -178,7 +243,9 @@ const styles = StyleSheet.create({
   formContainer: {
     backgroundColor: "#fff",
     borderRadius: 12,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 25,
+    marginHorizontal: 10,
     marginBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -202,27 +269,31 @@ const styles = StyleSheet.create({
     borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 15,
     fontSize: 16,
   },
   multilineInput: {
-    height: 100,
+    height: 80,
     textAlignVertical: "top",
+    marginBottom: 25,
+  },
+  colorScrollView: {
+    marginBottom: 25,
+    maxHeight: 50,
   },
   colorContainer: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 20,
-    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 5,
   },
   colorOption: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    margin: 8,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    marginHorizontal: 6,
   },
   selectedColor: {
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: "#000",
   },
   saveButton: {
@@ -230,22 +301,14 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingVertical: 14,
     alignItems: "center",
+    marginTop: 10,
+  },
+  disabledButton: {
+    backgroundColor: "#999",
   },
   saveButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  dismissButton: {
-    alignSelf: "flex-end",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 4,
-    marginBottom: 16,
-  },
-  dismissButtonText: {
-    fontSize: 14,
-    color: "#555",
   },
 });

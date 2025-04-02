@@ -6,6 +6,8 @@ import {
   TextInput,
   StyleSheet,
   ScrollView,
+  TouchableOpacity,
+  Platform,
 } from "react-native";
 import React, { useState } from "react";
 import { usePomodoro } from "@/contexts/AlarmContext";
@@ -93,10 +95,11 @@ export default function ProjectsScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Project Goal (optional)"
+              placeholder="e.g. Achieve [X Goal] by Dec 31, 2026"
               value={newProjectGoal}
               onChangeText={setNewProjectGoal}
               placeholderTextColor="#999"
+              multiline
             />
 
             <Text style={styles.label}>Project Color</Text>
@@ -125,6 +128,7 @@ export default function ProjectsScreen() {
               <Pressable
                 style={[styles.button, styles.createButton]}
                 onPress={handleCreateProject}
+                disabled={!newProjectName.trim()}
               >
                 <Text style={[styles.buttonText, styles.createButtonText]}>
                   Create

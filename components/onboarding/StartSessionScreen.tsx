@@ -5,11 +5,17 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  Modal,
+  Dimensions,
 } from "react-native";
 import { usePomodoro } from "@/contexts/AlarmContext";
 import OnboardingScreen from "./OnboardingScreen";
-import { OnboardingScreen as OnboardingScreenType } from "@/contexts/OnboardingContext";
+import {
+  OnboardingScreen as OnboardingScreenType,
+  useOnboarding,
+} from "@/contexts/OnboardingContext";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import { useRouter } from "expo-router";
 
 interface StartSessionScreenProps {
   screen: OnboardingScreenType;
@@ -19,6 +25,8 @@ interface StartSessionScreenProps {
   onBack?: () => void;
 }
 
+const { width, height } = Dimensions.get("window");
+
 export default function StartSessionScreen({
   screen,
   currentStep,
@@ -26,11 +34,15 @@ export default function StartSessionScreen({
   onNext,
   onBack,
 }: StartSessionScreenProps) {
+  const router = useRouter();
   const { projects, startFocusSession } = usePomodoro();
+  const { completeOnboarding } = useOnboarding();
   const [taskDescription, setTaskDescription] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [sessionDuration, setSessionDuration] = useState(60); // 1 hour default
+  const [sessionDuration, setSessionDuration] = useState(25); // Default duration
   const [isListening, setIsListening] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
 
   // Initialize with first project if available
   useEffect(() => {
@@ -39,15 +51,34 @@ export default function StartSessionScreen({
     }
   }, [projects]);
 
-  const handleStartSession = () => {
-    if (taskDescription && selectedProjectId) {
-      startFocusSession(taskDescription, selectedProjectId, []);
-      onNext();
+  const handleStartSession = async () => {
+    if (taskDescription && selectedProjectId && !isNavigating) {
+      setIsNavigating(true);
+      try {
+        // Start the focus session
+        startFocusSession(taskDescription, selectedProjectId, []);
+
+        // Mark onboarding as complete
+        await completeOnboarding();
+
+        // Close the modal
+        setShowModal(false);
+
+        // Explicitly navigate to tabs screen
+        setTimeout(() => {
+          console.log("[StartSessionScreen] Navigating to tabs screen");
+          router.replace("/(tabs)");
+        }, 300);
+      } catch (error) {
+        console.error("[StartSessionScreen] Navigation error:", error);
+        setIsNavigating(false);
+      }
     }
   };
 
   // Mock voice recognition with a preset task
   const startVoiceRecognition = () => {
+    setShowModal(true);
     setIsListening(true);
 
     // Simulate voice processing after 2 seconds
@@ -63,6 +94,11 @@ export default function StartSessionScreen({
     return project ? project.name : "Select Project";
   };
 
+  const closeModal = () => {
+    setShowModal(false);
+    setIsListening(false);
+  };
+
   return (
     <OnboardingScreen
       screen={screen}
@@ -72,55 +108,67 @@ export default function StartSessionScreen({
       onBack={onBack}
     >
       <View style={styles.container}>
-        <Text style={styles.promptText}>Start by saying...</Text>
+        <Text style={styles.titleText}>Begin with intention.</Text>
 
-        <View style={styles.exampleContainer}>
-          <Text style={styles.exampleText}>
-            "I am working on the landing page for Project X for 1 hour."
-          </Text>
-          <Text style={styles.explanationText}>
-            By saying it out loud, you've started a promise to yourself.
-          </Text>
-          <Text style={styles.motivationText}>Don't let yourself down.</Text>
-        </View>
-
-        {isListening ? (
-          <View style={styles.listeningContainer}>
-            <Text style={styles.listeningText}>LISTENING...</Text>
+        <TouchableOpacity
+          style={styles.micButton}
+          onPress={startVoiceRecognition}
+        >
+          <View style={styles.micIconContainer}>
+            <FontAwesome name="microphone" size={30} color="#fff" />
           </View>
-        ) : taskDescription ? (
-          <View style={styles.voiceResultContainer}>
-            <View style={styles.voiceResultContent}>
-              <Text style={styles.intentionPrompt}>I am working on</Text>
-              <Text style={styles.intentionTask}>{taskDescription}</Text>
-              <Text style={styles.intentionPrompt}>for</Text>
-              <Text style={styles.intentionProject}>
-                {getProjectName(selectedProjectId)}
-              </Text>
-              <Text style={styles.intentionPrompt}>for</Text>
-              <Text style={styles.intentionTime}>
-                {sessionDuration} minutes
-              </Text>
-            </View>
+          <Text style={styles.micButtonText}>SET INTENTION</Text>
+        </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.startButton}
-              onPress={handleStartSession}
-            >
-              <Text style={styles.startButtonText}>START SESSION</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.micButton}
-            onPress={startVoiceRecognition}
-          >
-            <View style={styles.micIconContainer}>
-              <FontAwesome name="microphone" size={30} color="#fff" />
+        {/* Full-screen Modal */}
+        <Modal visible={showModal} transparent={true} animationType="fade">
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              {isListening ? (
+                <View style={styles.listeningHeader}>
+                  <Text style={styles.listeningText}>LISTENING...</Text>
+                  <TouchableOpacity
+                    onPress={closeModal}
+                    style={styles.closeButton}
+                  >
+                    <Text style={styles.closeButtonText}>X</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.intentionForm}>
+                  <View style={styles.formRow}>
+                    <Text style={styles.formLabel}>I am working on</Text>
+                    <Text style={styles.formValue}>
+                      {taskDescription || "task"}
+                    </Text>
+                  </View>
+
+                  <View style={styles.formRow}>
+                    <Text style={styles.formLabel}>for</Text>
+                    <Text style={styles.formValue}>
+                      {getProjectName(selectedProjectId) || "project"}
+                    </Text>
+                  </View>
+
+                  <View style={styles.formRow}>
+                    <Text style={styles.formLabel}>for</Text>
+                    <Text style={styles.formValue}>
+                      {sessionDuration} minutes
+                    </Text>
+                    <Text style={styles.formEndPeriod}>.</Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.startButton}
+                    onPress={handleStartSession}
+                  >
+                    <Text style={styles.startButtonText}>START SESSION</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
-            <Text style={styles.micButtonText}>SET INTENTION</Text>
-          </TouchableOpacity>
-        )}
+          </View>
+        </Modal>
       </View>
     </OnboardingScreen>
   );
@@ -128,34 +176,16 @@ export default function StartSessionScreen({
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     marginVertical: 20,
   },
-  promptText: {
-    fontSize: 18,
-    color: "#666",
-    marginBottom: 16,
-  },
-  exampleContainer: {
-    marginBottom: 40,
-    alignItems: "center",
-  },
-  exampleText: {
-    fontSize: 20,
+  titleText: {
+    fontSize: 32,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 16,
-  },
-  explanationText: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  motivationText: {
-    fontSize: 16,
-    fontWeight: "500",
-    textDecorationLine: "underline",
+    marginBottom: 50,
   },
   micButton: {
     alignItems: "center",
@@ -173,63 +203,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "bold",
   },
-  listeningContainer: {
-    height: 120,
-    justifyContent: "center",
+  modalContainer: {
+    flex: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+  },
+  modalContent: {
+    flex: 1,
+    padding: 20,
+  },
+  listeningHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
   },
   listeningText: {
     fontSize: 18,
-    color: "#666",
+    fontWeight: "500",
   },
-  voiceResultContainer: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 24,
-    width: "100%",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+  closeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#eee",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  voiceResultContent: {
+  closeButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  intentionForm: {
+    flex: 1,
+    paddingTop: 60,
+    paddingHorizontal: 20,
+  },
+  formRow: {
     marginBottom: 30,
   },
-  intentionPrompt: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 4,
+  formLabel: {
+    fontSize: 18,
+    color: "#333",
+    marginBottom: 5,
   },
-  intentionTask: {
-    fontSize: 20,
+  formValue: {
+    fontSize: 24,
     fontWeight: "bold",
     borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-    paddingBottom: 4,
-    marginBottom: 16,
+    borderBottomColor: "#ccc",
+    paddingBottom: 8,
+    marginTop: 5,
   },
-  intentionProject: {
-    fontSize: 20,
+  formEndPeriod: {
+    fontSize: 24,
     fontWeight: "bold",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-    paddingBottom: 4,
-    marginBottom: 16,
-  },
-  intentionTime: {
-    fontSize: 20,
-    fontWeight: "bold",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
-    paddingBottom: 4,
-    marginBottom: 16,
   },
   startButton: {
     backgroundColor: "#000",
     borderRadius: 4,
     paddingVertical: 14,
     alignItems: "center",
+    marginTop: 50,
   },
   startButtonText: {
     color: "#fff",

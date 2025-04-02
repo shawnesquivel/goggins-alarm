@@ -25,45 +25,51 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
   {
     id: "welcome1",
     type: OnboardingScreenType.WELCOME,
-    title: '"I don\'t have enough time."',
+    title: '"What do you *really* want?"',
     description:
-      "But how many hours have you spent on social media this week instead of working on your dreams?",
+      "What is your dream?\n\nHow about A side hustle that makes $100K?\n\n100K followers on Instagram or TikTok?\n\nQuitting your job and starting your dream career.\n\nLet's do a short exercise.",
   },
   {
     id: "welcome2",
     type: OnboardingScreenType.WELCOME,
-    title: '"I don\'t have enough resources."',
+    title: "Imagine your dream life",
     description:
-      "Yet every day, people with the same circumstances as you make it.",
+      "Imagine you had *all those things* you're dreaming of.\n\nImagine how you'd feel if you focused for the next 6 months.\n\nClose your eyes for 30 seconds and *really feel it*.\n\nP.S. This is important. Do it for your future self.",
   },
   {
     id: "welcome3",
     type: OnboardingScreenType.WELCOME,
-    title: '"I just need to lock in"',
-    description: "Deep Work = Work Time * Quality of Work",
-    subtitle:
-      "1 hr of deep work > 3 hrs of scatterbrain\n\nBut why don't you do it?\n\nIt's simpler than you think...",
+    title: '"I ~don\'t~ have enough time."',
+    description:
+      "The average person:\n- Checks their phone 96 times a day (once every 10 minutes)\n- Wastes 2.5 hours daily on social media\n- Takes 23 minutes to refocus after each distraction",
   },
   {
     id: "concept1",
     type: OnboardingScreenType.CONCEPT,
-    title: "You just need discipline.",
+    title: "Deep Work: Your *Unfair* Advantage",
     description:
-      "If you can lock in, you can become the 1% of the population.\n\nOr go back to doomscrolling 3hrs/day and join the 99%.",
+      "Deep work means to concentrate for 30-90min with *zero* distractions.\n\nDeep Work = Quantity of Work × Quality of Work\n\nWhat others accomplish in 10 distracted hours, you'll finish in just 3.\n\nThis system took us from being in careers we hated, to working in our dream jobs remotely around the world.\n\nHere's how...",
   },
   {
     id: "concept2",
     type: OnboardingScreenType.CONCEPT,
     title: "1. Increase Deep Work quantity",
     description:
-      "Each work session is a chance to increase our focus capacity.\n\nFocus goes up and down.\n\nLong Term Consistency > Short Term Intensity",
+      "Each work session is like going to the gym.\n\nYour focus is like a muscle.\n\nThe more you use it, the stronger it gets.",
   },
   {
     id: "concept3",
     type: OnboardingScreenType.CONCEPT,
     title: "2. Increase Deep Work quality",
     description:
-      "For each Deep Work session, we ask:\n\n1. What you're working on\n2. How long you'll focus\n3. How it felt when you're done\n\nOur AI helps you understand the quality of your deep work over time.",
+      "Each Deep Work session, we'll ask:\n\n1. What you're working on\n2. How long you'll focus\n3. How it felt when you're done\n\nOur AI helps you understand the quality of your deep work over time.",
+  },
+  {
+    id: "concept4",
+    type: OnboardingScreenType.CONCEPT,
+    title: "3. Improve over time",
+    description:
+      "Every day, you'll aim to hit your goal (1-3hrs) and build a streak.\n\nOur AI will track your stats over time, and help unlock your *10X* productivity.",
   },
   {
     id: "setup1",
@@ -85,9 +91,16 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
     description: "You can always change this later.",
   },
   {
+    id: "setup3",
+    type: OnboardingScreenType.SETUP,
+    title: "Set your daily intention goal.",
+    description:
+      "Most people fail because they push *too hard, too fast*.\n\n~Don't~ be that person!\n\nSet a daily focus goal that you can commit to for the next 7 days, no matter what.\n\nWe highly recommend starting at 30-60min per day.\n\nYou can change this goal any time.",
+  },
+  {
     id: "start",
     type: OnboardingScreenType.START,
-    title: "Begin with intention.",
+    title: "Begin with *intention*.",
     description: "Start your Deep Work Session",
     action: "Start Session",
   },
@@ -105,6 +118,7 @@ interface OnboardingContextType {
   previousScreen: () => void;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
+  isLoading: boolean;
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(
@@ -118,6 +132,7 @@ export function OnboardingProvider({
 }) {
   const [isOnboarding, setIsOnboarding] = useState<boolean>(true);
   const [currentScreenIndex, setCurrentScreenIndex] = useState<number>(0);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Check if onboarding has been completed before
   useEffect(() => {
@@ -125,10 +140,23 @@ export function OnboardingProvider({
       try {
         const value = await AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY);
         if (value === "true") {
+          console.log("[OnboardingContext] Onboarding previously completed.");
           setIsOnboarding(false);
+        } else {
+          console.log("[OnboardingContext] Onboarding not completed.");
+          setIsOnboarding(true);
         }
       } catch (error) {
-        console.error("Error checking onboarding status:", error);
+        console.error(
+          "[OnboardingContext] Error checking onboarding status:",
+          error
+        );
+        setIsOnboarding(true);
+      } finally {
+        console.log(
+          "[OnboardingContext] Finished check, setting isLoading false."
+        );
+        setIsLoading(false);
       }
     };
 
@@ -158,12 +186,17 @@ export function OnboardingProvider({
   };
 
   const resetOnboarding = async () => {
+    console.log("[OnboardingContext] Resetting onboarding...");
     try {
       await AsyncStorage.removeItem(ONBOARDING_COMPLETED_KEY);
+      console.log("[OnboardingContext] AsyncStorage key removed.");
       setIsOnboarding(true);
       setCurrentScreenIndex(0);
+      console.log(
+        "[OnboardingContext] State set: isOnboarding=true, currentScreenIndex=0"
+      );
     } catch (error) {
-      console.error("Error resetting onboarding:", error);
+      console.error("[OnboardingContext] Error resetting onboarding:", error);
     }
   };
 
@@ -178,6 +211,7 @@ export function OnboardingProvider({
         previousScreen,
         completeOnboarding,
         resetOnboarding,
+        isLoading,
       }}
     >
       {children}
