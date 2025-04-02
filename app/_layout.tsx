@@ -5,13 +5,14 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { useFonts } from "expo-font";
-import { Stack } from "expo-router";
+import { Stack, Slot } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import "react-native-reanimated";
 import "../global.css";
 import { useColorScheme } from "@/components/useColorScheme";
-import { AlarmProvider } from "@/contexts/AlarmContext";
+import { PomodoroProvider } from "@/contexts/AlarmContext";
+import { OnboardingProvider } from "@/contexts/OnboardingContext";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -48,9 +49,11 @@ export default function RootLayout() {
   }
 
   return (
-    <AlarmProvider>
-      <RootLayoutNav />
-    </AlarmProvider>
+    <OnboardingProvider>
+      <PomodoroProvider>
+        <RootLayoutNav />
+      </PomodoroProvider>
+    </OnboardingProvider>
   );
 }
 
@@ -59,8 +62,8 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="modal"
           options={{
@@ -69,6 +72,11 @@ function RootLayoutNav() {
             title: "FAQ",
           }}
         />
+        <Stack.Screen
+          name="onboarding"
+          options={{ presentation: "fullScreenModal" }}
+        />
+        <Stack.Screen name="index" redirect={true} />
       </Stack>
     </ThemeProvider>
   );

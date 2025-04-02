@@ -4,142 +4,138 @@ import { Text, View } from "@/components/Themed";
 
 export default function ModalScreen() {
   return (
-    <ScrollView style={styles.scrollView}>
-      <View style={styles.container}>
-        <Text style={styles.title}>mentality alarm.</Text>
-        <View
-          style={styles.separator}
-          lightColor="#eee"
-          darkColor="rgba(255,255,255,0.1)"
-        />
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        <Text style={styles.title}>Pomodoro Timer</Text>
 
-        <View style={styles.quote}>
-          <Text style={styles.quoteText}>
-            "The only way to get better is to get after it every single day." -
-            David Goggins
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            What is the Pomodoro technique?
+          </Text>
+          <Text style={styles.paragraph}>
+            The Pomodoro Technique is a time management method developed by
+            Francesco Cirillo in the late 1980s. It uses a timer to break work
+            into intervals, traditionally 25 minutes in length, separated by
+            short breaks.
+          </Text>
+          <Text style={styles.paragraph}>
+            Each interval is known as a pomodoro, from the Italian word for
+            tomato, after the tomato-shaped kitchen timer Cirillo used as a
+            university student.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🎯 The Mission</Text>
-          <Text style={styles.description}>
-            Build mental toughness through discipline. No excuses. No cookie
-            cutter shit. No easy way out.
+          <Text style={styles.sectionTitle}>How to use this app</Text>
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>1. Create Projects:</Text> Start by
+            creating projects in the Projects tab. These represent the different
+            areas of your work or side projects.
+          </Text>
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>2. Start a Focus Session:</Text> On the
+            Timer tab, enter what you're working on, select the relevant project
+            and tags, and start a focus session.
+          </Text>
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>3. Stay Focused:</Text> Work without
+            distractions until the timer completes. You can use full-screen mode
+            for fewer distractions.
+          </Text>
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>4. Take Breaks:</Text> When a focus
+            session ends, take a short break. The app can automatically start a
+            break timer.
+          </Text>
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>5. Rate Your Sessions:</Text> After each
+            session, rate how productive it was and optionally add notes.
+          </Text>
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>6. Track Progress:</Text> Use the Reports
+            tab to see your focus time statistics and track progress over time.
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚡ Features</Text>
-          <Text style={styles.feature}>
-            • Build discipline through consistency.
+          <Text style={styles.sectionTitle}>
+            Benefits of the Pomodoro Technique
           </Text>
-          <Text style={styles.feature}>
-            • Stay accountable with photo verification.
+          <Text style={styles.paragraph}>
+            • Reduces distractions and mental fatigue
+          </Text>
+          <Text style={styles.paragraph}>
+            • Increases accountability and motivation
+          </Text>
+          <Text style={styles.paragraph}>
+            • Improves planning and estimation skills
+          </Text>
+          <Text style={styles.paragraph}>
+            • Creates a better work/break balance
+          </Text>
+          <Text style={styles.paragraph}>
+            • Helps maintain consistent focus quality
           </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>❓ FAQ</Text>
-
-          <Text style={styles.question}>How does the alarm work?</Text>
-          <Text style={styles.answer}>
-            Set your wake-up time. When the alarm goes off, you must take a
-            photo of your running shoes to turn it off. No shortcuts.
+          <Text style={styles.sectionTitle}>Tips for Success</Text>
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>Start Small:</Text> If 25 minutes seems
+            too long, begin with shorter sessions and work your way up.
           </Text>
-
-          <Text style={styles.question}>What happens if I try to snooze?</Text>
-          <Text style={styles.answer}>
-            David Goggins will laugh at you, share some motivation, and the
-            alarm will repeat every minute until you get up and take the photo.
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>Respect Breaks:</Text> Breaks are an
+            essential part of the technique. Don't skip them!
           </Text>
-
-          <Text style={styles.question}>Why running shoes?</Text>
-          <Text style={styles.answer}>
-            The app uses AI to verify you're showing running shoes. This creates
-            a mental connection between waking up and working out.
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>Batch Small Tasks:</Text> Use a single
+            pomodoro for multiple small tasks to maintain efficiency.
           </Text>
-
-          <Text style={styles.question}>
-            Can I disable the alarm another way?
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>Track Progress:</Text> Regularly review
+            your reports to see patterns in your productivity.
           </Text>
-          <Text style={styles.answer}>
-            No. The only way to disable the alarm is to take a photo of your
-            running shoes. This builds mental toughness and prevents excuses.
+          <Text style={styles.paragraph}>
+            <Text style={styles.bold}>Adjust as Needed:</Text> Customize session
+            durations based on your personal work style.
           </Text>
         </View>
+      </ScrollView>
 
-        <StatusBar style={Platform.OS === "ios" ? "light" : "auto"} />
-      </View>
-    </ScrollView>
+      {/* Use a light status bar on iOS to account for the black space above the modal */}
+      <StatusBar style={Platform.OS === "ios" ? "light" : "auto"} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
   container: {
     flex: 1,
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 48,
+  },
+  scrollView: {
+    flex: 1,
+    padding: 20,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    marginTop: 20,
-  },
-  separator: {
-    marginVertical: 20,
-    height: 1,
-    width: "80%",
-  },
-  section: {
-    width: "100%",
-    marginBottom: 32,
-  },
-  sectionTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 16,
-    color: "#007AFF",
+    marginBottom: 20,
   },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
-    textAlign: "left",
-    marginBottom: 16,
+  section: {
+    marginBottom: 24,
   },
-  feature: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  paragraph: {
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 12,
   },
-  quote: {
-    backgroundColor: "#1c1c1e",
-    padding: 24,
-    borderRadius: 12,
-    width: "100%",
-    marginTop: 24,
-    marginBottom: 24,
-  },
-  quoteText: {
-    fontSize: 16,
-    fontStyle: "italic",
-    textAlign: "center",
-    color: "#ffffff",
-  },
-  question: {
-    fontSize: 18,
+  bold: {
     fontWeight: "bold",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  answer: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 16,
-    color: "#8E8E93",
   },
 });

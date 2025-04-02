@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Image, Alert } from "react-native";
 import { Text, View } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
-import { useAlarms } from "@/contexts/AlarmContext";
+import { usePomodoro } from "@/contexts/AlarmContext";
 import AlarmTriggerModal from "@/components/AlarmTriggerModal";
 import Constants from "expo-constants";
 
@@ -11,56 +11,17 @@ const OPENAI_API_KEY = Constants.expoConfig?.extra?.openaiApiKey;
 
 export default function CameraScreen() {
   const router = useRouter();
-  const {
-    hasShoePhotoToday,
-    setLastShoePhotoDate,
-    alarmSound,
-    isAlarmTriggered,
-    setIsAlarmTriggered,
-  } = useAlarms();
+  const { projects } = usePomodoro();
   const [permission, requestPermission] = useCameraPermissions();
   const [lastPhoto, setLastPhoto] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [openAIResponse, setOpenAIResponse] = useState<string>("");
-  const cameraRef = useRef(null);
+  const cameraRef = useRef<CameraView>(null);
 
   const analyzeImage = async (base64Image: string) => {
     try {
-      const response = await fetch(
-        "https://api.openai.com/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-          },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: "Are these running shoes? Answer only 'true' or 'false'.",
-                  },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: `data:image/jpeg;base64,${base64Image}`,
-                    },
-                  },
-                ],
-              },
-            ],
-            max_tokens: 1,
-          }),
-        }
-      );
-
-      const data = await response.json();
-      setOpenAIResponse(JSON.stringify(data, null, 2));
-      return data.choices[0].message.content.toLowerCase() === "true";
+      console.log("Image analysis not needed in Pomodoro app");
+      return true;
     } catch (error) {
       console.error("Error analyzing image:", error);
       setOpenAIResponse(`Error: ${error}`);
@@ -68,15 +29,13 @@ export default function CameraScreen() {
     }
   };
 
-  const handlePhotoValidation = async (isRunningShoes: boolean) => {
-    if (isRunningShoes) {
-      setLastShoePhotoDate(new Date());
-      alarmSound.stopSound();
-      Alert.alert("Success!", "Running shoes verified! Alarm disabled.", [
+  const handlePhotoValidation = async (isValid: boolean) => {
+    if (isValid) {
+      Alert.alert("Success!", "Photo captured successfully.", [
         { text: "OK", onPress: () => router.back() },
       ]);
     } else {
-      Alert.alert("Try Again", "Those don't look like running shoes!");
+      Alert.alert("Try Again", "Photo validation failed.");
     }
   };
 
@@ -94,11 +53,11 @@ export default function CameraScreen() {
 
       setLastPhoto(photo.uri);
 
-      const isRunningShoes = await analyzeImage(photo.base64);
-      if (!isRunningShoes) {
+      const isValid = await analyzeImage(photo.base64);
+      if (!isValid) {
         setLastPhoto(null);
       }
-      await handlePhotoValidation(isRunningShoes);
+      await handlePhotoValidation(isValid);
     } catch (error) {
       console.error("Error taking/analyzing picture:", error);
       Alert.alert("Error", "Failed to analyze image");
@@ -128,18 +87,19 @@ export default function CameraScreen() {
     );
   }
 
-  if (hasShoePhotoToday()) {
+  if (projects.length > 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.text}>All set. Go crush your workout.</Text>
+        <Text style={styles.text}>
+          Camera feature is not needed in Pomodoro mode
+        </Text>
         <Pressable
           style={styles.button}
           onPress={() => {
-            alarmSound.stopSound();
             router.back();
           }}
         >
-          <Text style={styles.buttonText}>Back to Home</Text>
+          <Text style={styles.buttonText}>Back to Timer</Text>
         </Pressable>
       </View>
     );
@@ -195,14 +155,6 @@ export default function CameraScreen() {
           <Text style={styles.responseText}>{openAIResponse}</Text>
         </View>
       )}
-
-      <AlarmTriggerModal
-        visible={isAlarmTriggered}
-        onDismiss={() => {
-          setIsAlarmTriggered(false);
-          alarmSound.stopSound();
-        }}
-      />
     </View>
   );
 }
