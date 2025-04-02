@@ -2,7 +2,6 @@ import React from "react";
 import {
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   Dimensions,
   SafeAreaView,
@@ -12,10 +11,11 @@ import {
   Platform,
 } from "react-native";
 import { OnboardingScreen as OnboardingScreenType } from "@/contexts/OnboardingContext";
-import FormattedText from "./FormattedText";
+import StyledText from "./StyledText";
 
 interface OnboardingScreenProps {
   screen: OnboardingScreenType;
+
   currentStep: number;
   totalSteps: number;
   onNext: () => void;
@@ -26,6 +26,135 @@ interface OnboardingScreenProps {
 }
 
 const { width, height } = Dimensions.get("window");
+
+// Function to render formatted text based on screen ID and content
+const renderFormattedTitle = (screen: OnboardingScreenType) => {
+  switch (screen.id) {
+    case "welcome1":
+      return (
+        <Text className="text-4xl font-bold text-center">
+          "What do you <StyledText italic>really</StyledText> want?"
+        </Text>
+      );
+    case "welcome3":
+      return (
+        <Text className="text-4xl font-bold text-center">
+          <StyledText strikethrough>"I don't have enough time."</StyledText>
+        </Text>
+      );
+    case "concept1":
+      return (
+        <Text className="text-4xl font-bold text-center">
+          Deep Work: Your <StyledText italic>Unfair</StyledText> Advantage
+        </Text>
+      );
+    case "start":
+      return (
+        <Text className="text-4xl font-bold text-center">
+          Begin with <StyledText italic>intention</StyledText>.
+        </Text>
+      );
+    default:
+      return (
+        <Text className="text-4xl font-bold text-center">{screen.title}</Text>
+      );
+  }
+};
+
+// Function to render formatted description
+const renderFormattedDescription = (screen: OnboardingScreenType) => {
+  // Screen-specific description rendering
+  if (screen.id === "welcome2") {
+    return (
+      <View className="mt-8">
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          Imagine you had <StyledText italic>all those things</StyledText>{" "}
+          you're dreaming of.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          Imagine how you'd feel if you focused for the next 6 months.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          Close your eyes for 30 seconds and{" "}
+          <StyledText italic>really feel it</StyledText>.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7">
+          P.S. This is important. Do it for your future self.
+        </Text>
+      </View>
+    );
+  }
+
+  if (screen.id === "concept1") {
+    return (
+      <View className="mt-8">
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          Deep work means to concentrate for 30-90min with{" "}
+          <StyledText italic>zero</StyledText> distractions.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          Deep Work = Quantity of Work × Quality of Work
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          What others accomplish in 10 distracted hours, you'll finish in just
+          3.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7">
+          This system took us from being in careers we hated, to working in our
+          dream jobs remotely around the world.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7 mt-5">
+          Here's how...
+        </Text>
+      </View>
+    );
+  }
+
+  if (screen.id === "concept4") {
+    return (
+      <View className="mt-8">
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          Every day, you'll aim to hit your goal (1-3hrs) and build a streak.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7">
+          Our AI will track your stats over time, and help unlock your{" "}
+          <StyledText italic>10X</StyledText> productivity.
+        </Text>
+      </View>
+    );
+  }
+
+  if (screen.id === "setup3") {
+    return (
+      <View className="mt-8">
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          Most people fail because they push{" "}
+          <StyledText italic>too hard, too fast</StyledText>.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          <StyledText strikethrough>Don't</StyledText> be that person!
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          Set a daily focus goal that you can commit to for the next 7 days, no
+          matter what.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7 mb-5">
+          We highly recommend starting at 30-60min per day.
+        </Text>
+        <Text className="text-lg text-center text-[#555] leading-7">
+          You can change this goal any time.
+        </Text>
+      </View>
+    );
+  }
+
+  // Default case - just render the description as regular text
+  return screen.description ? (
+    <Text className="text-lg text-center text-[#555] leading-7 mt-8">
+      {screen.description}
+    </Text>
+  ) : null;
+};
 
 export default function OnboardingScreen({
   screen,
@@ -45,73 +174,58 @@ export default function OnboardingScreen({
 
   return (
     <TouchableWithoutFeedback onPress={dismissKeyboard}>
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView className="flex-1 bg-[#f8f8f8]">
         <StatusBar barStyle="dark-content" />
 
         {/* Header - version info */}
-        <View style={styles.header}>
-          <Text style={styles.versionText}>
+        <View className="px-4 pt-2">
+          <Text className="text-xs text-[#999]">
             Sign Up Version {currentStep + 11}
           </Text>
         </View>
 
-        {/* Tailwind Test Section */}
-        <View className="bg-primary m-4 p-4 rounded-lg">
-          <Text className="text-white font-pbold text-center">
-            Hello Tailwind! If this looks styled, Tailwind is working!
-          </Text>
-          <Text className="text-red-500 font-pbold text-center">
-            Hello Tailwind! If this looks styled, Tailwind is working!
-          </Text>
-          <Text className="text-blue-500 font-pbold text-center">
-            Hello Tailwind! If this looks styled, Tailwind is working!
-          </Text>
-        </View>
-
         {/* Main content */}
-        <View style={styles.content}>
-          <View style={styles.titleContainer}>
-            <FormattedText text={screen.title} style={styles.title} />
+        <View className="flex-1 px-6">
+          {/* Title section - positioned at 30% from top */}
+          <View className="mt-[25%]">
+            {renderFormattedTitle(screen)}
             {screen.subtitle && (
-              <FormattedText text={screen.subtitle} style={styles.subtitle} />
+              <Text className="text-lg text-center text-[#333] mt-4">
+                {screen.subtitle}
+              </Text>
             )}
           </View>
 
-          {screen.description && (
-            <FormattedText
-              text={screen.description}
-              style={styles.description}
-            />
-          )}
+          {/* Description section */}
+          {renderFormattedDescription(screen)}
 
-          <View style={styles.childrenContainer}>{children}</View>
+          {/* Children components */}
+          <View className="mt-8 flex-1">{children}</View>
         </View>
 
         {/* Bottom navigation - always at the bottom */}
-        <View style={styles.bottomContainer}>
+        <View className="w-full mb-6">
           {/* Navigation buttons */}
-          <View style={styles.navigationContainer}>
+          <View className="flex-row justify-between px-5 pb-5">
             {showBackButton ? (
-              <TouchableOpacity style={styles.backButton} onPress={onBack}>
-                <Text style={styles.backButtonText}>BACK</Text>
+              <TouchableOpacity className="py-3 px-6" onPress={onBack}>
+                <Text className="text-base font-medium text-[#333]">BACK</Text>
               </TouchableOpacity>
             ) : (
-              <View style={styles.emptySpace} />
+              <View className="w-20" />
             )}
 
             <TouchableOpacity
-              style={[
-                styles.nextButton,
-                disableNext && styles.disabledNextButton,
-              ]}
+              className={`py-3 px-8 rounded ${
+                disableNext ? "bg-[#999]" : "bg-black"
+              }`}
               onPress={onNext}
               disabled={disableNext}
             >
               <Text
-                style={[
-                  styles.nextButtonText,
-                  disableNext && styles.disabledNextButtonText,
-                ]}
+                className={`text-base font-medium ${
+                  disableNext ? "text-[#ddd]" : "text-white"
+                }`}
               >
                 {screen.action || "NEXT"}
               </Text>
@@ -119,12 +233,10 @@ export default function OnboardingScreen({
           </View>
 
           {/* Progress bar */}
-          <View style={styles.progressBarContainer}>
+          <View className="h-1 bg-[#e0e0e0]">
             <View
-              style={[
-                styles.progressBar,
-                { width: `${((currentStep + 1) / totalSteps) * 100}%` },
-              ]}
+              className="h-1 bg-black"
+              style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
             />
           </View>
         </View>
@@ -132,95 +244,3 @@ export default function OnboardingScreen({
     </TouchableWithoutFeedback>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f8f8f8",
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  versionText: {
-    color: "#999",
-    fontSize: 12,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    paddingBottom: 10,
-  },
-  titleContainer: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 25,
-  },
-  subtitle: {
-    fontSize: 18,
-    textAlign: "center",
-    color: "#333",
-  },
-  description: {
-    fontSize: 16,
-    textAlign: "center",
-    color: "#555",
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  childrenContainer: {
-    flex: 1,
-  },
-  bottomContainer: {
-    width: "100%",
-  },
-  navigationContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  backButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-  },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#333",
-  },
-  nextButton: {
-    backgroundColor: "#000",
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    borderRadius: 4,
-  },
-  disabledNextButton: {
-    backgroundColor: "#999",
-  },
-  nextButtonText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#fff",
-  },
-  disabledNextButtonText: {
-    color: "#ddd",
-  },
-  emptySpace: {
-    width: 80,
-  },
-  progressBarContainer: {
-    height: 4,
-    backgroundColor: "#e0e0e0",
-    marginBottom: Platform.OS === "ios" ? 24 : 16,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: "#000",
-  },
-});

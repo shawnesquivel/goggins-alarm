@@ -55,23 +55,45 @@ export default function StartSessionScreen({
     if (taskDescription && selectedProjectId && !isNavigating) {
       setIsNavigating(true);
       try {
+        console.log("[StartSessionScreen] Beginning start session flow");
+
+        // Mark onboarding as complete first
+        await completeOnboarding();
+        console.log("[StartSessionScreen] Onboarding marked as complete");
+
         // Start the focus session
         startFocusSession(taskDescription, selectedProjectId, []);
-
-        // Mark onboarding as complete
-        await completeOnboarding();
+        console.log("[StartSessionScreen] Focus session started");
 
         // Close the modal
         setShowModal(false);
 
-        // Explicitly navigate to tabs screen
+        // Explicitly navigate to tabs screen with a longer delay
+        // to ensure state updates have time to complete
         setTimeout(() => {
           console.log("[StartSessionScreen] Navigating to tabs screen");
-          router.replace("/(tabs)");
-        }, 300);
+          try {
+            router.replace("/(tabs)");
+          } catch (navError) {
+            console.error("[StartSessionScreen] Navigation failed:", navError);
+            // Fallback navigation attempt
+            setTimeout(() => {
+              console.log(
+                "[StartSessionScreen] Attempting fallback navigation"
+              );
+              router.push("/(tabs)");
+            }, 500);
+          }
+        }, 1000);
       } catch (error) {
-        console.error("[StartSessionScreen] Navigation error:", error);
+        console.error("[StartSessionScreen] Session start error:", error);
         setIsNavigating(false);
+
+        // Try to navigate anyway as a fallback
+        setTimeout(() => {
+          console.log("[StartSessionScreen] Fallback navigation after error");
+          router.replace("/");
+        }, 1000);
       }
     }
   };

@@ -46,8 +46,29 @@ export default function Onboarding() {
               onBack={previousScreen}
             />
           );
+        } else if (currentScreen.id === "setup3") {
+          // Use the standard OnboardingScreen for setup3
+          console.log("[Onboarding] Rendering setup3 screen");
+          return (
+            <OnboardingScreen
+              screen={currentScreen}
+              currentStep={currentScreenIndex}
+              totalSteps={totalScreens}
+              onNext={nextScreen}
+              onBack={previousScreen}
+            />
+          );
         }
-        break;
+        // Remove the break to allow falling through to default case for any other setup screens
+        return (
+          <OnboardingScreen
+            screen={currentScreen}
+            currentStep={currentScreenIndex}
+            totalSteps={totalScreens}
+            onNext={nextScreen}
+            onBack={previousScreen}
+          />
+        );
 
       case OnboardingScreenType.TRIAL:
         return (

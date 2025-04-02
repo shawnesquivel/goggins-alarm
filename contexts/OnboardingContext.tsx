@@ -41,7 +41,7 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
     type: OnboardingScreenType.WELCOME,
     title: '"I ~don\'t~ have enough time."',
     description:
-      "The average person:\n- Checks their phone 96 times a day (once every 10 minutes)\n- Wastes 2.5 hours daily on social media\n- Takes 23 minutes to refocus after each distraction",
+      "The average person:\n- Checks their phone 96 times a day (once every 10 minutes)\n- Wastes 2.5 hours daily on social media\n- Takes 23 minutes to refocus after each distraction\n\nThat's why we built this app to help you reclaim your focus.",
   },
   {
     id: "concept1",
