@@ -93,12 +93,12 @@ export default function SingleAlarm({
         </Text>
         <FontAwesome name="pencil" size={20} color="#666" />
       </Pressable>
-
+      {/* 
       <TestComponents
         onTriggerAlarm={onTriggerAlarm}
         resetPhotoStatus={resetPhotoStatus}
         storageContents={storageContents}
-      />
+      /> */}
     </View>
   );
 }
