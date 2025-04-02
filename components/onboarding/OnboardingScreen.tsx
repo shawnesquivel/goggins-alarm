@@ -93,7 +93,7 @@ const renderFormattedDescription = (screen: OnboardingScreenType) => {
           <StyledText italic>zero</StyledText> distractions.
         </Text>
         <Text className="text-lg text-center text-[#555] leading-7 mb-5">
-          Deep Work = Quantity of Work × Quality of Work
+          Deep Work = Hours × Quality of Work
         </Text>
         <Text className="text-lg text-center text-[#555] leading-7 mb-5">
           What others accomplish in 10 distracted hours, you'll finish in just

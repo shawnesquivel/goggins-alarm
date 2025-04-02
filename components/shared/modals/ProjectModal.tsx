@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Modal, View, TextInput, TouchableOpacity } from "react-native";
-import { Text } from "@/components/Themed";
+import {
+  Modal,
+  View,
+  TextInput,
+  TouchableOpacity,
+  Text,
+  Dimensions,
+} from "react-native";
 import type { Project } from "../../../types/project";
 
 interface ProjectModalProps {
@@ -20,6 +26,8 @@ const colors = [
   "#00C853", // Green
 ];
 
+const { height } = Dimensions.get("window");
+
 export default function ProjectModal({
   visible,
   onClose,
@@ -33,9 +41,9 @@ export default function ProjectModal({
 
   useEffect(() => {
     if (project) {
-      setName(project.name);
-      setGoal(project.goal);
-      setSelectedColor(project.color);
+      setName(project.name || "");
+      setGoal(project.goal || "");
+      setSelectedColor(project.color || colors[0]);
     } else {
       // Reset form for new projects
       setName("");
@@ -57,86 +65,157 @@ export default function ProjectModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide">
-      <View className="flex-1 justify-center items-center bg-black/80">
-        <View className="bg-white w-11/12 max-w-md rounded-2xl overflow-hidden">
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "flex-end",
+          backgroundColor: "transparent",
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: "white",
+            borderTopLeftRadius: 24,
+            borderTopRightRadius: 24,
+            padding: 24,
+            maxHeight: height * 0.9, // 90% of screen height max
+          }}
+        >
           {/* Header */}
-          <View className="p-6 border-b border-gray-200">
-            <Text className="text-2xl font-bold text-center">
-              {mode === "add" ? "Add Project" : "Edit Project"}
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 24,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "600", color: "#000" }}>
+              ADD A PROJECT
             </Text>
+            <TouchableOpacity onPress={onClose}>
+              <Text style={{ fontSize: 20, color: "#000" }}>×</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Form */}
-          <View className="p-6">
+          <View>
             {/* Project Name */}
-            <View className="mb-6">
-              <Text className="text-sm font-medium mb-2 text-gray-700">
+            <View style={{ marginBottom: 24 }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "500",
+                  marginBottom: 8,
+                  color: "#000",
+                }}
+              >
                 Project Name
               </Text>
               <TextInput
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-base"
-                placeholder="Enter project name"
+                style={{
+                  width: "100%",
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: "#E5E5E5",
+                  fontSize: 16,
+                  color: "#000",
+                }}
+                placeholder="Project name"
                 value={name}
                 onChangeText={setName}
+                placeholderTextColor="#999"
               />
             </View>
 
             {/* Project Goal */}
-            <View className="mb-6">
-              <Text className="text-sm font-medium mb-2 text-gray-700">
+            <View style={{ marginBottom: 24 }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "500",
+                  marginBottom: 8,
+                  color: "#000",
+                }}
+              >
                 Project Goal
               </Text>
               <TextInput
-                className="w-full px-4 py-3 rounded-lg border border-gray-300 text-base"
-                placeholder="Enter project goal"
+                style={{
+                  width: "100%",
+                  height: 96,
+                  paddingHorizontal: 16,
+                  paddingVertical: 12,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: "#E5E5E5",
+                  fontSize: 16,
+                  color: "#000",
+                  textAlignVertical: "top",
+                }}
+                placeholder="Describe your big goal for this project"
                 value={goal}
                 onChangeText={setGoal}
                 multiline
+                placeholderTextColor="#999"
               />
             </View>
 
             {/* Color Selection */}
-            <View className="mb-6">
-              <Text className="text-sm font-medium mb-2 text-gray-700">
-                Color
+            <View style={{ marginBottom: 32 }}>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: "500",
+                  marginBottom: 8,
+                  color: "#000",
+                }}
+              >
+                Project Color
               </Text>
-              <View className="flex-row flex-wrap gap-3">
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 16 }}>
                 {colors.map((color) => (
                   <TouchableOpacity
                     key={color}
                     onPress={() => setSelectedColor(color)}
-                    className={`w-10 h-10 rounded-full items-center justify-center border-2 ${
-                      selectedColor === color
-                        ? "border-black"
-                        : "border-transparent"
-                    }`}
-                    style={{ backgroundColor: color }}
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 24,
+                      backgroundColor: color,
+                      borderWidth: selectedColor === color ? 2 : 0,
+                      borderColor: "#000",
+                    }}
                   />
                 ))}
               </View>
             </View>
           </View>
 
-          {/* Actions */}
-          <View className="flex-row border-t border-gray-200">
-            <TouchableOpacity
-              onPress={onClose}
-              className="flex-1 p-4 border-r border-gray-200"
+          {/* Save Button */}
+          <TouchableOpacity
+            onPress={handleSave}
+            style={{
+              width: "100%",
+              backgroundColor: name.trim() ? "#000" : "#999",
+              paddingVertical: 16,
+              borderRadius: 8,
+            }}
+            disabled={!name.trim()}
+          >
+            <Text
+              style={{
+                color: "#fff",
+                textAlign: "center",
+                fontWeight: "600",
+                fontSize: 16,
+              }}
             >
-              <Text className="text-center text-gray-600 font-medium">
-                Cancel
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleSave}
-              className="flex-1 p-4 bg-black"
-              disabled={!name.trim()}
-            >
-              <Text className="text-center text-white font-medium">
-                {mode === "add" ? "Add Project" : "Save Changes"}
-              </Text>
-            </TouchableOpacity>
-          </View>
+              SAVE PROJECT
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
