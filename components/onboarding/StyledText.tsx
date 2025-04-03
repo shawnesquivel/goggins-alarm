@@ -1,11 +1,12 @@
 import React, { ReactNode } from "react";
-import { View, Text } from "react-native";
+import { View, Text, TextStyle } from "react-native";
 
 interface StyledTextProps {
   children: ReactNode;
   italic?: boolean;
   strikethrough?: boolean;
   className?: string;
+  style?: TextStyle;
 }
 
 /**
@@ -16,9 +17,11 @@ export const StyledText: React.FC<StyledTextProps> = ({
   italic = false,
   strikethrough = false,
   className = "",
+  style,
 }) => {
   return (
     <Text
+      style={style}
       className={`
         ${italic ? "italic" : ""}
         ${strikethrough ? "line-through" : ""}

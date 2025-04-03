@@ -13,6 +13,11 @@ import "../global.css";
 import { useColorScheme } from "@/components/useColorScheme";
 import { PomodoroProvider } from "@/contexts/AlarmContext";
 import { OnboardingProvider } from "@/contexts/OnboardingContext";
+import {
+  Figtree_400Regular,
+  Figtree_500Medium,
+} from "@expo-google-fonts/figtree";
+import { LibreBaskerville_400Regular } from "@expo-google-fonts/libre-baskerville";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -28,23 +33,19 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [loaded, error] = useFonts({
-    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
-    ...FontAwesome.font,
+  const [fontsLoaded] = useFonts({
+    Figtree_400Regular,
+    Figtree_500Medium,
+    LibreBaskerville_400Regular,
   });
 
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
-    if (error) throw error;
-  }, [error]);
-
-  useEffect(() => {
-    if (loaded) {
+    if (fontsLoaded) {
       SplashScreen.hideAsync();
     }
-  }, [loaded]);
+  }, [fontsLoaded]);
 
-  if (!loaded) {
+  if (!fontsLoaded) {
     return null;
   }
 

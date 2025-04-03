@@ -32,7 +32,7 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
   {
     id: "welcome2",
     type: OnboardingScreenType.WELCOME,
-    title: "Imagine your dream life",
+    title: "Imagine your *dream* life",
     description:
       "Imagine you had *all those things* you're dreaming of.\n\nImagine how you'd feel if you focused for the next 6 months.\n\nClose your eyes for 30 seconds and *really feel it*.\n\nP.S. This is important. Do it for your future self.",
   },
