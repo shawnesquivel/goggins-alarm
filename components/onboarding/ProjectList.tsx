@@ -31,14 +31,6 @@ export default function ProjectList({
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  // Log when component renders or updates
-  console.log("ProjectList render:", {
-    projectsCount: projects.length,
-    isModalVisible,
-    selectedProject,
-    projects,
-  });
-
   const handleEditProject = (project: Project) => {
     console.log("handleEditProject called with:", project);
     try {
