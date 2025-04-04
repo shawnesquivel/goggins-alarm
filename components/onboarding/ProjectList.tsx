@@ -69,7 +69,7 @@ export default function ProjectList({
   }, [isModalVisible]);
 
   return (
-    <View className="flex-1">
+    <View className="flex-1 w-full">
       <ScrollView className="flex-1">
         {projects.map((project) => (
           <TouchableOpacity
@@ -78,20 +78,29 @@ export default function ProjectList({
               console.log("Project TouchableOpacity pressed:", project);
               handleEditProject(project);
             }}
-            className="flex-row items-center p-4 bg-white rounded-lg mb-3"
+            className="flex-row items-center p-4 rounded-lg mb-3"
             activeOpacity={0.7}
           >
             <View
-              className="w-3 h-3 rounded-full mr-3"
+              className="w-5 h-5 rounded-full mr-3 border border-black"
               style={{ backgroundColor: project.color || "#ccc" }}
             />
             <View className="flex-1">
-              <Text className="text-base font-medium">{project.name}</Text>
+              <Text
+                style={{ fontFamily: "Figtree_500Medium" }}
+                className="text-base"
+              >
+                {project.name}
+              </Text>
               {project.goal && (
-                <Text className="text-sm text-[#666]">{project.goal}</Text>
+                <Text
+                  style={{ fontFamily: "Figtree_400Regular" }}
+                  className="text-sm text-[#666]"
+                >
+                  {project.goal}
+                </Text>
               )}
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#999" />
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -101,10 +110,15 @@ export default function ProjectList({
           setSelectedProject(null);
           setIsModalVisible(true);
         }}
-        className="flex-row items-center justify-center bg-black py-4 rounded-lg mt-4"
+        className="flex-row items-center justify-center py-4 rounded-lg mt-4"
       >
-        <Ionicons name="add" size={24} color="white" />
-        <Text className="text-white font-medium ml-2">Add Another Project</Text>
+        <Ionicons name="add" size={24} color="black" />
+        <Text
+          style={{ fontFamily: "Figtree_500Medium" }}
+          className="text-black ml-2 text-lg"
+        >
+          Add Another Project
+        </Text>
       </TouchableOpacity>
 
       <ProjectModal
@@ -114,7 +128,7 @@ export default function ProjectList({
           setIsModalVisible(false);
           setSelectedProject(null);
         }}
-        project={selectedProject}
+        project={selectedProject || undefined}
         onSave={handleSave}
         onDelete={
           selectedProject

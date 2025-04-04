@@ -85,7 +85,6 @@ export default function ProjectSetupScreen({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.projectListContainer}>
-            <Text style={styles.listTitle}>Your Focus Areas</Text>
             <ProjectList
               projects={projects}
               onAddProject={handleAddProject}
