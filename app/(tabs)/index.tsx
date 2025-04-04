@@ -14,6 +14,8 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { TimerStatus } from "@/types/alarm";
 import StartSessionModal from "@/components/shared/modals/StartSessionModal";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 export default function TimerScreen() {
   const router = useRouter();
@@ -28,6 +30,7 @@ export default function TimerScreen() {
     settings,
     projects,
   } = usePomodoro();
+  const { session } = useAuth();
 
   // Local state
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -158,6 +161,42 @@ export default function TimerScreen() {
     </View>
   );
 
+  // Function to display user info for debugging
+  const renderAuthDebug = () => {
+    if (!session) {
+      return (
+        <View style={styles.debugContainer}>
+          <Text style={styles.debugText}>Status: Not authenticated</Text>
+          <TouchableOpacity
+            style={styles.debugButton}
+            onPress={() => router.push("/login")}
+          >
+            <Text style={styles.debugButtonText}>Go to Login</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.debugContainer}>
+        <Text style={styles.debugText}>Status: Authenticated ✓</Text>
+        <Text style={styles.debugText}>User: {session.user.email}</Text>
+        <Text style={styles.debugText}>
+          ID: {session.user.id.substring(0, 8)}...
+        </Text>
+        <TouchableOpacity
+          style={styles.debugButton}
+          onPress={async () => {
+            await supabase.auth.signOut();
+            router.replace("/login");
+          }}
+        >
+          <Text style={styles.debugButtonText}>Sign Out</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return isFullScreen ? (
     <FullScreenTimer />
   ) : (
@@ -165,6 +204,9 @@ export default function TimerScreen() {
       style={styles.container}
       contentContainerStyle={styles.contentContainer}
     >
+      {/* Auth Debug Panel (only in development mode) */}
+      {__DEV__ && renderAuthDebug()}
+
       {/* Timer Display */}
       <View style={styles.timerSection}>
         {currentSession ? (
@@ -219,17 +261,22 @@ export default function TimerScreen() {
       />
 
       {/* Rating Modal */}
-      <Modal visible={showRatingModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
+      <Modal
+        visible={showRatingModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowRatingModal(false)}
+      >
+        <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>How was your focus session?</Text>
 
-            <View style={styles.ratingsContainer}>
+            <View style={styles.ratingContainer}>
               <TouchableOpacity
                 style={styles.ratingButton}
                 onPress={() => handleCompleteSession("happy")}
               >
-                <Text style={styles.ratingEmoji}>😊</Text>
+                <FontAwesome name="smile-o" size={32} color="#4CAF50" />
                 <Text style={styles.ratingText}>Productive</Text>
               </TouchableOpacity>
 
@@ -237,56 +284,57 @@ export default function TimerScreen() {
                 style={styles.ratingButton}
                 onPress={() => handleCompleteSession("sad")}
               >
-                <Text style={styles.ratingEmoji}>😞</Text>
-                <Text style={styles.ratingText}>Could be better</Text>
+                <FontAwesome name="frown-o" size={32} color="#F44336" />
+                <Text style={styles.ratingText}>Distracted</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.inputLabel}>Notes (optional)</Text>
+            <Text style={styles.notesLabel}>Session Notes (optional):</Text>
             <TextInput
               style={styles.notesInput}
-              placeholder="Add session notes..."
+              multiline={true}
               value={sessionNotes}
               onChangeText={setSessionNotes}
-              multiline
-              placeholderTextColor="#999"
+              placeholder="What did you accomplish? What could be improved?"
             />
 
             <TouchableOpacity
-              style={styles.skipButton}
+              style={styles.submitButton}
               onPress={() => handleCompleteSession()}
             >
-              <Text style={styles.skipButtonText}>Skip Rating</Text>
+              <Text style={styles.submitButtonText}>Skip Rating</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
       {/* Cancel Confirmation Modal */}
-      <Modal visible={showCancelConfirmation} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+      <Modal
+        visible={showCancelConfirmation}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowCancelConfirmation(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, styles.confirmationModal]}>
             <Text style={styles.modalTitle}>Cancel Session?</Text>
-            <Text style={styles.modalDescription}>
-              Are you sure you want to cancel the current session? Your progress
-              will not be saved.
+            <Text style={styles.confirmationText}>
+              Are you sure you want to cancel your current focus session?
             </Text>
 
-            <View style={styles.buttonContainer}>
+            <View style={styles.confirmationButtons}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelModalButton]}
+                style={[styles.confirmButton, styles.cancelButton]}
                 onPress={() => setShowCancelConfirmation(false)}
               >
-                <Text style={styles.cancelModalButtonText}>
-                  Continue Session
-                </Text>
+                <Text style={styles.confirmButtonText}>No, Keep Going</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmModalButton]}
+                style={[styles.confirmButton, styles.confirmCancelButton]}
                 onPress={confirmCancelSession}
               >
-                <Text style={styles.confirmModalButtonText}>Yes, Cancel</Text>
+                <Text style={styles.confirmButtonText}>Yes, Cancel</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -299,10 +347,10 @@ export default function TimerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f8f8",
+    backgroundColor: "#fff",
   },
   contentContainer: {
-    padding: 16,
+    padding: 20,
   },
   timerSection: {
     alignItems: "center",
@@ -356,7 +404,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
   },
-  modalOverlay: {
+  modalContainer: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "center",
@@ -375,40 +423,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: "center",
   },
-  modalDescription: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 8,
-  },
-  cancelModalButton: {
-    backgroundColor: "#f1f1f1",
-  },
-  confirmModalButton: {
-    backgroundColor: "#FF3B30",
-  },
-  cancelModalButtonText: {
-    color: "#333",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  confirmModalButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  ratingsContainer: {
+  ratingContainer: {
     flexDirection: "row",
     justifyContent: "space-around",
     marginBottom: 24,
@@ -417,15 +432,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 10,
   },
-  ratingEmoji: {
-    fontSize: 40,
-    marginBottom: 8,
-  },
   ratingText: {
     fontSize: 16,
     color: "#666",
   },
-  inputLabel: {
+  notesLabel: {
     fontSize: 16,
     color: "#333",
     marginBottom: 8,
@@ -440,11 +451,11 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
     marginBottom: 16,
   },
-  skipButton: {
+  submitButton: {
     paddingVertical: 10,
     alignItems: "center",
   },
-  skipButtonText: {
+  submitButtonText: {
     color: "#999",
     fontSize: 16,
   },
@@ -516,5 +527,61 @@ const styles = StyleSheet.create({
   },
   exitButton: {
     backgroundColor: "rgba(255,255,255,0.2)",
+  },
+  debugContainer: {
+    padding: 10,
+    margin: 10,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: "#ddd",
+  },
+  debugText: {
+    fontSize: 12,
+    fontFamily: "monospace",
+    marginBottom: 4,
+  },
+  debugButton: {
+    marginTop: 8,
+    backgroundColor: "#ff6b6b",
+    padding: 6,
+    borderRadius: 4,
+    alignItems: "center",
+  },
+  debugButtonText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
+  },
+  confirmationModal: {
+    padding: 20,
+  },
+  confirmationText: {
+    fontSize: 16,
+    color: "#666",
+    marginBottom: 24,
+    textAlign: "center",
+  },
+  confirmationButtons: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 8,
+  },
+  cancelButton: {
+    backgroundColor: "#f1f1f1",
+  },
+  confirmCancelButton: {
+    backgroundColor: "#FF3B30",
+  },
+  confirmButtonText: {
+    color: "#333",
+    fontSize: 16,
+    fontWeight: "500",
   },
 });

@@ -6,7 +6,7 @@ export default {
     scheme: "com.deepwork",
     extra: {
       openaiApiKey: process.env.OPENAI_API_KEY,
-      supabaseUrl: process.env.REACT_NATIVE_SUPABASE_URL,
+      supabaseUrl: "https://jsgqekncltjwfjggntvx.supabase.co",
       supabaseAnonKey: process.env.REACT_NATIVE_SUPABASE_ANON_KEY,
     },
     plugins: ["expo-font", "expo-router"],
