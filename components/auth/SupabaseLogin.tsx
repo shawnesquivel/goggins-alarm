@@ -1,17 +1,42 @@
 import React, { useEffect } from "react";
-import { View, Alert, Platform, TouchableOpacity, Text } from "react-native";
+import {
+  View,
+  Alert,
+  Platform,
+  TouchableOpacity,
+  Text,
+  Linking as RNLinking,
+} from "react-native";
 import { supabase } from "../../lib/supabase";
 import { useRouter } from "expo-router";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import * as WebBrowser from "expo-web-browser";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import Constants from "expo-constants";
+import * as Linking from "expo-linking";
 
 export default function Auth({ isOnboardingFlow = false }) {
   const router = useRouter();
-  const { nextScreen } = useOnboarding();
+  const { nextScreen, resetOnboarding } = useOnboarding();
 
-  // Initialize authentication
+  // Log Supabase configuration on mount
   useEffect(() => {
+    console.log("Supabase URL:", Constants.expoConfig?.extra?.supabaseUrl);
+    console.log("App URL scheme:", Constants.expoConfig?.scheme);
+
+    // Determine redirect URL based on platform
+    const redirectUrl = Platform.select({
+      web: `${window.location.origin}/login-callback`,
+      default: Linking.createURL("login-callback"),
+    });
+    console.log("Redirect URL:", redirectUrl);
+
+    // Check if we can reach Supabase
+    fetch(`${Constants.expoConfig?.extra?.supabaseUrl}/auth/v1/health`)
+      .then((response) => response.json())
+      .then((data) => console.log("Supabase health check:", data))
+      .catch((error) => console.error("Cannot reach Supabase:", error));
+
     // Check for existing session if not in onboarding flow
     if (!isOnboardingFlow) {
       supabase.auth.getSession().then(({ data: { session } }) => {
@@ -24,41 +49,71 @@ export default function Auth({ isOnboardingFlow = false }) {
 
   const signInWithGoogle = async () => {
     try {
+      console.log("Starting Google sign-in process");
+
+      // Determine proper redirect URL based on platform
+      const redirectUrl = Platform.select({
+        web: `${window.location.origin}/login-callback`,
+        default: Linking.createURL("login-callback"),
+      });
+
+      console.log("Using redirect URL:", redirectUrl);
+
+      // Try the OAuth flow
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: "com.deepwork://login-callback",
+          redirectTo: redirectUrl,
         },
       });
 
+      console.log("OAuth response:", { data, error });
+
       if (error) {
+        console.error("OAuth error:", error);
         Alert.alert("Error", error.message);
       } else if (data?.url) {
-        // Open the browser for authentication
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          "com.deepwork://login-callback"
-        );
+        console.log("Auth URL:", data.url);
 
-        if (result.type === "success") {
-          // Handle successful authentication
-          const { data: sessionData } = await supabase.auth.getSession();
+        // Handle differently based on platform
+        if (Platform.OS === "web") {
+          // For web, just navigate to the URL
+          window.location.href = data.url;
+        } else {
+          // For native, use the WebBrowser
+          try {
+            const result = await WebBrowser.openAuthSessionAsync(
+              data.url,
+              redirectUrl
+            );
 
-          if (sessionData.session) {
-            if (isOnboardingFlow) {
-              nextScreen();
-            } else {
-              router.replace("/(tabs)");
+            console.log("Auth session result:", result);
+
+            if (result.type === "success") {
+              console.log("Auth success from browser");
+              const { data: sessionData } = await supabase.auth.getSession();
+
+              if (sessionData.session) {
+                if (isOnboardingFlow) {
+                  nextScreen();
+                } else {
+                  router.replace("/(tabs)");
+                }
+              }
             }
+          } catch (browserError) {
+            console.error("Browser error:", browserError);
+            Alert.alert("Error", "Could not open the authentication page.");
           }
         }
       }
     } catch (error: any) {
+      console.error("Sign-in error:", error);
       Alert.alert("Error", error.message || "Error during Google sign in");
-      console.error(error);
     }
   };
 
+  // Apple sign-in unchanged
   const signInWithApple = async () => {
     try {
       const { data, error } = await supabase.auth.signInWithOAuth({
@@ -95,6 +150,11 @@ export default function Auth({ isOnboardingFlow = false }) {
     }
   };
 
+  const handleGoToOnboarding = () => {
+    resetOnboarding();
+    router.replace("/onboarding");
+  };
+
   return (
     <View className="mt-10 px-3 items-center">
       {/* Google Sign-In Button */}
@@ -126,6 +186,13 @@ export default function Auth({ isOnboardingFlow = false }) {
           <Text className="text-white font-medium">Sign in with Apple</Text>
         </TouchableOpacity>
       )}
+
+      {/* Go back to onboarding link */}
+      <TouchableOpacity className="mt-8" onPress={handleGoToOnboarding}>
+        <Text className="text-blue-500 text-center">
+          New to Deep Work? Start the tutorial again
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
