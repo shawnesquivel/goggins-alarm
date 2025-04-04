@@ -2,15 +2,20 @@ import React from "react";
 import { ActivityIndicator, View, StyleSheet } from "react-native";
 import { Redirect, useRootNavigationState } from "expo-router";
 import { useOnboarding } from "@/contexts/OnboardingContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function InitialRouteScreen() {
-  const { isLoading, isOnboarding } = useOnboarding();
+  const { isLoading: isOnboardingLoading, isOnboarding } = useOnboarding();
+  const { session, isLoading: isAuthLoading } = useAuth();
   // Get the navigation state to ensure the navigator is ready
   const rootNavigationState = useRootNavigationState();
+
+  const isLoading = isOnboardingLoading || isAuthLoading;
 
   console.log("[IndexScreen] Rendering.", {
     isLoading,
     isOnboarding,
+    isAuthenticated: !!session,
     isNavigatorReady: !!rootNavigationState?.key,
   });
 
@@ -24,9 +29,9 @@ export default function InitialRouteScreen() {
     );
   }
 
-  // If still loading onboarding state, show loading indicator
+  // If still loading status, show loading indicator
   if (isLoading) {
-    console.log("[IndexScreen] Still loading onboarding status...");
+    console.log("[IndexScreen] Still loading status...");
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
@@ -34,12 +39,18 @@ export default function InitialRouteScreen() {
     );
   }
 
-  // Now both navigation is ready AND onboarding status is loaded
+  // Now both navigation is ready AND status is loaded
   // We can safely use the declarative Redirect component
 
   if (isOnboarding) {
     console.log("[IndexScreen] Navigation ready, redirecting to /onboarding");
     return <Redirect href="/onboarding" />;
+  }
+
+  // Only check auth if onboarding is complete
+  if (!session) {
+    console.log("[IndexScreen] Not authenticated, redirecting to /login");
+    return <Redirect href="/login" />;
   }
 
   console.log("[IndexScreen] Navigation ready, redirecting to /(tabs)");

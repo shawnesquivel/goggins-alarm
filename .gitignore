@@ -35,6 +35,7 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 dev_docs
+docs
 .env
 
 # Android - ignore completely
