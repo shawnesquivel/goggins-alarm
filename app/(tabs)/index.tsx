@@ -14,6 +14,10 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
 import { TimerStatus } from "@/types/alarm";
 import StartSessionModal from "@/components/shared/modals/StartSessionModal";
+import {
+  useFonts,
+  LibreCaslonText_400Regular,
+} from "@expo-google-fonts/libre-caslon-text";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 
@@ -31,6 +35,10 @@ export default function TimerScreen() {
     projects,
   } = usePomodoro();
   const { session } = useAuth();
+
+  const [fontsLoaded] = useFonts({
+    LibreCaslonText_400Regular,
+  });
 
   // Local state
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -111,55 +119,66 @@ export default function TimerScreen() {
   };
 
   // Full screen timer component
-  const FullScreenTimer = () => (
-    <View style={styles.fullScreenContainer}>
-      <View style={styles.fullScreenContent}>
-        <View style={styles.fullScreenHeader}>
-          <TouchableOpacity
-            style={styles.fullScreenCancelButton}
-            onPress={handleCancelSession}
-          >
-            <FontAwesome name="times" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
+  const FullScreenTimer = () => {
+    if (!fontsLoaded) return null;
 
-        <Text style={styles.fullScreenTask}>
-          {currentSession?.taskDescription}
-        </Text>
-        <Text style={styles.fullScreenTimer}>
-          {formatTimeDisplay(remainingSeconds)}
-        </Text>
-        {currentSession?.type === "focus" && (
-          <>
-            <Text style={styles.fullScreenProject}>
-              {getProjectName(currentSession.projectId)}
-            </Text>
-            {getProjectGoal(currentSession.projectId) && (
-              <Text style={styles.fullScreenGoal}>
-                Goal: {getProjectGoal(currentSession.projectId)}
+    return (
+      <View style={styles.fullScreenContainer}>
+        <View style={styles.fullScreenContent}>
+          <View style={styles.fullScreenHeader}>
+            <TouchableOpacity
+              style={styles.fullScreenCancelButton}
+              onPress={handleCancelSession}
+            >
+              <FontAwesome name="times" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.fullScreenTask}>
+            {currentSession?.taskDescription}
+          </Text>
+          <Text
+            style={[
+              styles.fullScreenTimer,
+              { fontFamily: "LibreCaslonText_400Regular" },
+            ]}
+          >
+            {formatTimeDisplay(remainingSeconds)}
+          </Text>
+          {currentSession?.type === "focus" && (
+            <>
+              <Text style={styles.fullScreenProject}>
+                {getProjectName(currentSession.projectId)}
               </Text>
-            )}
-          </>
-        )}
+              {getProjectGoal(currentSession.projectId) && (
+                <Text style={styles.fullScreenGoal}>
+                  Goal: {getProjectGoal(currentSession.projectId)}
+                </Text>
+              )}
+            </>
+          )}
 
-        <View style={styles.fullScreenControls}>
-          <TouchableOpacity
-            style={styles.fullScreenButton}
-            onPress={handleTimerControls}
-          >
-            <Text style={styles.fullScreenButtonText}>{getButtonText()}</Text>
-          </TouchableOpacity>
+          <View style={styles.fullScreenControls}>
+            <TouchableOpacity
+              style={styles.fullScreenButton}
+              onPress={handleTimerControls}
+            >
+              <Text style={styles.fullScreenButtonText}>{getButtonText()}</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.fullScreenButton, styles.exitButton]}
-            onPress={() => setIsFullScreen(false)}
-          >
-            <Text style={styles.fullScreenButtonText}>Exit Full Screen</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.fullScreenButton, styles.exitButton]}
+              onPress={() => setIsFullScreen(false)}
+            >
+              <Text style={styles.fullScreenButtonText}>Exit Full Screen</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
-  );
+    );
+  };
+
+  if (!fontsLoaded) return null;
 
   // Function to display user info for debugging
   const renderAuthDebug = () => {
@@ -214,7 +233,12 @@ export default function TimerScreen() {
             <Text style={styles.taskText}>
               {currentSession.taskDescription}
             </Text>
-            <Text style={styles.timerText}>
+            <Text
+              style={[
+                styles.timerText,
+                { fontFamily: "LibreCaslonText_400Regular" },
+              ]}
+            >
               {formatTimeDisplay(remainingSeconds)}
             </Text>
             <Text style={styles.projectText}>
