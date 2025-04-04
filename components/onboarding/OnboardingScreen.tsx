@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import {
   View,
   Text,
@@ -9,7 +9,6 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   Platform,
-  Animated,
 } from "react-native";
 import { OnboardingScreen as OnboardingScreenType } from "@/contexts/OnboardingContext";
 import StyledText from "./StyledText";
@@ -26,10 +25,25 @@ import {
   Figtree_600SemiBold,
   Figtree_700Bold,
 } from "@expo-google-fonts/figtree";
+import Reanimated, {
+  FadeInUp,
+  FadeOut,
+  SlideInUp,
+  runOnJS,
+  withDelay,
+  withSequence,
+  withTiming,
+  Layout,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from "react-native-reanimated";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 
 // Create animated components once outside of the render functions
-const AnimatedText = Animated.createAnimatedComponent(Text);
-const AnimatedStyledText = Animated.createAnimatedComponent(StyledText);
+const AnimatedText = Reanimated.createAnimatedComponent(Text);
+const AnimatedStyledText = Reanimated.createAnimatedComponent(StyledText);
+const AnimatedView = Reanimated.createAnimatedComponent(View);
 
 interface OnboardingScreenProps {
   screen: OnboardingScreenType;
@@ -48,7 +62,7 @@ const { width, height } = Dimensions.get("window");
 // Function to render formatted text based on screen ID and content
 const renderFormattedTitle = (
   screen: OnboardingScreenType,
-  fadeAnim: Animated.Value
+  fadeAnim: number
 ) => {
   const [fontsLoaded] = useFonts({
     LibreBaskerville_400Regular,
@@ -60,114 +74,68 @@ const renderFormattedTitle = (
     return null;
   }
 
-  const titleStyle = {
+  const baseStyle = {
     fontFamily: "LibreBaskerville_400Regular",
     lineHeight: 46,
-    opacity: 0,
   };
 
-  const renderAnimatedText = (content: React.ReactNode) => (
-    <AnimatedText
-      style={[
-        titleStyle,
-        {
-          opacity: fadeAnim,
-          transform: [
-            {
-              translateY: fadeAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [20, 0],
-              }),
-            },
-          ],
-        },
-      ]}
-      className="text-4xl text-center"
-    >
-      {content}
-    </AnimatedText>
-  );
+  const renderAnimatedText = (content: string) => {
+    // Split the content by formatting markers
+    const parts = content.split(/(\*[^*]+\*|~[^~]+~)/);
 
-  switch (screen.id) {
-    case "welcome1":
-      return renderAnimatedText(
-        <>
-          "What do you{" "}
-          <AnimatedStyledText
-            italic
-            style={{ fontFamily: "LibreBaskerville_400Regular_Italic" }}
-          >
-            really
-          </AnimatedStyledText>{" "}
-          want?"
-        </>
-      );
-    case "welcome2":
-      return renderAnimatedText(
-        <>
-          Imagine your{" "}
-          <AnimatedStyledText
-            italic
-            style={{ fontFamily: "LibreBaskerville_400Regular_Italic" }}
-          >
-            dream
-          </AnimatedStyledText>{" "}
-          life
-        </>
-      );
-    case "welcome3":
-      return renderAnimatedText(
-        <>
-          <AnimatedStyledText
-            strikethrough
-            style={{ fontFamily: "LibreBaskerville_400Regular" }}
-          >
-            "I don't have enough{" "}
-            <AnimatedStyledText
-              italic
-              style={{ fontFamily: "LibreBaskerville_400Regular_Italic" }}
-            >
-              time.
-            </AnimatedStyledText>
-            {""}"
-          </AnimatedStyledText>
-        </>
-      );
-    case "concept1":
-      return renderAnimatedText(
-        <>
-          Deep Work: Your{" "}
-          <AnimatedStyledText
-            italic
-            style={{ fontFamily: "LibreBaskerville_400Regular_Italic" }}
-          >
-            Unfair
-          </AnimatedStyledText>{" "}
-          Advantage
-        </>
-      );
-    case "start":
-      return renderAnimatedText(
-        <>
-          Begin with{" "}
-          <AnimatedStyledText
-            italic
-            style={{ fontFamily: "LibreBaskerville_400Regular_Italic" }}
-          >
-            intention
-          </AnimatedStyledText>
-          .
-        </>
-      );
-    default:
-      return renderAnimatedText(screen.title);
-  }
+    return (
+      <AnimatedText
+        style={[
+          baseStyle,
+          {
+            opacity: fadeAnim,
+            transform: [
+              {
+                translateY: fadeAnim * 20,
+              },
+            ],
+          },
+        ]}
+        className="text-4xl text-center"
+      >
+        {parts.map((part, index) => {
+          if (part.startsWith("*") && part.endsWith("*")) {
+            return (
+              <Text
+                key={index}
+                style={{
+                  fontFamily: "LibreBaskerville_400Regular_Italic",
+                }}
+              >
+                {part.slice(1, -1)}
+              </Text>
+            );
+          } else if (part.startsWith("~") && part.endsWith("~")) {
+            return (
+              <Text
+                key={index}
+                style={{
+                  fontFamily: "LibreBaskerville_400Regular",
+                  textDecorationLine: "line-through",
+                }}
+              >
+                {part.slice(1, -1)}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </AnimatedText>
+    );
+  };
+
+  return renderAnimatedText(screen.title);
 };
 
 // Function to render formatted description
 const renderFormattedDescription = (
   screen: OnboardingScreenType,
-  fadeAnims: Animated.Value[]
+  fadeAnims: number[]
 ) => {
   const [figtreeLoaded] = useFigtreeFonts({
     Figtree_400Regular,
@@ -182,159 +150,211 @@ const renderFormattedDescription = (
 
   const textStyle = {
     fontFamily: "Figtree_400Regular",
-    opacity: 0,
-  };
-  const italicStyle = {
-    fontFamily: "Figtree_400Regular",
-    opacity: 0,
   };
 
-  const renderAnimatedText = (content: React.ReactNode, index: number) => (
-    <AnimatedText
-      style={[
-        textStyle,
-        {
-          opacity: fadeAnims[index],
-          transform: [
-            {
-              translateY: fadeAnims[index].interpolate({
-                inputRange: [0, 1],
-                outputRange: [20, 0],
-              }),
-            },
-          ],
-        },
-      ]}
-      className="text-lg text-center text-[#555] leading-7 mb-5"
-    >
-      {content}
-    </AnimatedText>
+  const renderLine = (content: string, index: number) => {
+    const parts = content.split(/(\*[^*]+\*|~[^~]+~)/);
+    return (
+      <AnimatedText
+        key={index}
+        style={[
+          textStyle,
+          {
+            opacity: fadeAnims[index],
+            transform: [
+              {
+                translateY: fadeAnims[index] * 20,
+              },
+            ],
+          },
+        ]}
+        className="text-lg text-center text-[#555] leading-7 mb-5"
+      >
+        {parts.map((part, partIndex) => {
+          if (part.startsWith("*") && part.endsWith("*")) {
+            return (
+              <Text
+                key={partIndex}
+                style={{
+                  fontFamily: "Figtree_500Medium",
+                  fontStyle: "italic",
+                }}
+              >
+                {part.slice(1, -1)}
+              </Text>
+            );
+          } else if (part.startsWith("~") && part.endsWith("~")) {
+            return (
+              <Text
+                key={partIndex}
+                style={{
+                  fontFamily: "Figtree_400Regular",
+                  textDecorationLine: "line-through",
+                }}
+              >
+                {part.slice(1, -1)}
+              </Text>
+            );
+          }
+          return part;
+        })}
+      </AnimatedText>
+    );
+  };
+
+  // Default case - always split by newlines and render line by line
+  const lines = screen.description?.split("\n\n") || [];
+  return (
+    <View className="mt-8">
+      {lines.map((line, index) => renderLine(line, index))}
+    </View>
   );
-
-  // Screen-specific description rendering
-  if (screen.id === "welcome2") {
-    return (
-      <View className="mt-8">
-        {renderAnimatedText(
-          <>
-            Imagine you had{" "}
-            <AnimatedStyledText italic style={italicStyle}>
-              all those things
-            </AnimatedStyledText>{" "}
-            you're dreaming of.
-          </>,
-          0
-        )}
-        {renderAnimatedText(
-          "Imagine how you'd feel if you focused for the next 6 months.",
-          1
-        )}
-        {renderAnimatedText(
-          <>
-            Close your eyes for 30 seconds and{" "}
-            <AnimatedStyledText italic style={italicStyle}>
-              really feel it
-            </AnimatedStyledText>
-            .
-          </>,
-          2
-        )}
-        {renderAnimatedText(
-          "P.S. This is important. Do it for your future self.",
-          3
-        )}
-      </View>
-    );
-  }
-
-  if (screen.id === "concept1") {
-    return (
-      <View className="mt-8">
-        {renderAnimatedText(
-          <>
-            Deep work means to concentrate for 30-90min with{" "}
-            <AnimatedStyledText italic style={italicStyle}>
-              zero
-            </AnimatedStyledText>{" "}
-            distractions.
-          </>,
-          0
-        )}
-        {renderAnimatedText("Deep Work = Hours × Quality of Work", 1)}
-        {renderAnimatedText(
-          "What others accomplish in 10 distracted hours, you'll finish in just 3.",
-          2
-        )}
-        {renderAnimatedText(
-          "This system took us from being in careers we hated, to working in our dream jobs remotely around the world.",
-          3
-        )}
-        {renderAnimatedText("Here's how...", 4)}
-      </View>
-    );
-  }
-
-  if (screen.id === "concept4") {
-    return (
-      <View className="mt-8">
-        {renderAnimatedText(
-          "Every day, you'll aim to hit your goal (1-3hrs) and build a streak.",
-          0
-        )}
-        {renderAnimatedText(
-          <>
-            Our AI will track your stats over time, and help unlock your{" "}
-            <AnimatedStyledText italic style={italicStyle}>
-              10X
-            </AnimatedStyledText>{" "}
-            productivity.
-          </>,
-          1
-        )}
-      </View>
-    );
-  }
-
-  if (screen.id === "setup3") {
-    return (
-      <View className="mt-8">
-        {renderAnimatedText(
-          <>
-            Most people fail because they push{" "}
-            <AnimatedStyledText italic style={italicStyle}>
-              too hard, too fast
-            </AnimatedStyledText>
-            .
-          </>,
-          0
-        )}
-        {renderAnimatedText(
-          <>
-            <AnimatedStyledText strikethrough style={textStyle}>
-              Don't
-            </AnimatedStyledText>{" "}
-            be that person!
-          </>,
-          1
-        )}
-        {renderAnimatedText(
-          "Set a daily focus goal that you can commit to for the next 7 days, no matter what.",
-          2
-        )}
-        {renderAnimatedText(
-          "We highly recommend starting at 30-60min per day.",
-          3
-        )}
-        {renderAnimatedText("You can change this goal any time.", 4)}
-      </View>
-    );
-  }
-
-  // Default case - render the description as animated text
-  return screen.description ? (
-    <View className="mt-8">{renderAnimatedText(screen.description, 0)}</View>
-  ) : null;
 };
+
+// Animated text line component
+const AnimatedLine = React.memo(
+  ({
+    content,
+    index,
+    style,
+    textStyle,
+    isTitle = false,
+  }: {
+    content: string;
+    index: number;
+    style?: any;
+    textStyle?: any;
+    isTitle?: boolean;
+  }) => {
+    // Parse content for italic and strikethrough
+    const parts = content.split(/(\*[^*]+\*|~[^~]+~)/);
+
+    // Title animation: quick and immediate
+    // Body text: starts after 600ms, then 150ms between lines
+    const delay = isTitle ? 300 : 1000 + index * 800;
+
+    return (
+      <AnimatedView
+        style={[style]}
+        entering={FadeInUp.delay(delay)
+          .springify()
+          .mass(0.3) // Lighter animation
+          .damping(15)} // More rigid
+        exiting={FadeOut}
+        layout={Layout.springify()}
+      >
+        <Text style={textStyle}>
+          {parts.map((part: string, partIndex: number) => {
+            if (part.startsWith("*") && part.endsWith("*")) {
+              return (
+                <Text
+                  key={partIndex}
+                  style={{
+                    fontFamily: isTitle
+                      ? "LibreBaskerville_400Regular_Italic"
+                      : "Figtree_500Medium",
+                    fontStyle: "italic",
+                  }}
+                >
+                  {part.slice(1, -1)}
+                </Text>
+              );
+            } else if (part.startsWith("~") && part.endsWith("~")) {
+              return (
+                <Text
+                  key={partIndex}
+                  style={{
+                    fontFamily: isTitle
+                      ? "LibreBaskerville_400Regular"
+                      : "Figtree_400Regular",
+                    textDecorationLine: "line-through",
+                  }}
+                >
+                  {part.slice(1, -1)}
+                </Text>
+              );
+            }
+            return part;
+          })}
+        </Text>
+      </AnimatedView>
+    );
+  }
+);
+
+// Animated description component
+const AnimatedDescription = React.memo(
+  ({ screen }: { screen: OnboardingScreenType }) => {
+    const [figtreeLoaded] = useFigtreeFonts({
+      Figtree_400Regular,
+      Figtree_500Medium,
+      Figtree_600SemiBold,
+      Figtree_700Bold,
+    });
+
+    if (!figtreeLoaded) return null;
+
+    const textStyle = {
+      fontFamily: "Figtree_400Regular",
+      fontSize: 18,
+      textAlign: "center" as const,
+      color: "#555",
+      lineHeight: 28,
+    };
+
+    const lines = screen.description?.split("\n\n") || [];
+
+    return (
+      <View className="mt-8">
+        {lines.map((line: string, index: number) => (
+          <AnimatedLine
+            key={`${screen.id}-${index}`}
+            content={line}
+            index={index}
+            style={{ marginBottom: 20 }}
+            textStyle={textStyle}
+          />
+        ))}
+      </View>
+    );
+  }
+);
+
+// Animated title component
+const AnimatedTitle = React.memo(
+  ({ screen }: { screen: OnboardingScreenType }) => {
+    const [fontsLoaded] = useFonts({
+      LibreBaskerville_400Regular,
+      LibreBaskerville_700Bold,
+      LibreBaskerville_400Regular_Italic,
+    });
+
+    if (!fontsLoaded) return null;
+
+    const titleStyle = {
+      fontFamily: "LibreBaskerville_400Regular",
+      fontSize: 36,
+      textAlign: "center" as const,
+      lineHeight: 46,
+    };
+
+    return (
+      <AnimatedView
+        style={{ width: "100%" }}
+        entering={FadeInUp.springify().mass(0.3).damping(15)}
+        exiting={FadeOut}
+        layout={Layout.springify()}
+      >
+        <AnimatedLine
+          content={screen.title}
+          index={0}
+          textStyle={titleStyle}
+          isTitle={true}
+        />
+      </AnimatedView>
+    );
+  }
+);
 
 export default function OnboardingScreen({
   screen,
@@ -347,36 +367,28 @@ export default function OnboardingScreen({
   disableNext,
 }: OnboardingScreenProps) {
   const showBackButton = currentStep > 0 && onBack;
-  const titleFadeAnim = useRef(new Animated.Value(0)).current;
-  const descriptionFadeAnims = useRef(
-    Array(10)
-      .fill(0)
-      .map(() => new Animated.Value(0))
-  ).current;
+  const { progress, previousProgress, updateProgress } = useOnboarding();
+
+  const progressValue = useSharedValue(progress);
+  const previousProgressValue = useSharedValue(previousProgress);
 
   useEffect(() => {
-    // Reset animations when screen changes
-    titleFadeAnim.setValue(0);
-    descriptionFadeAnims.forEach((anim) => anim.setValue(0));
+    // Calculate the new progress
+    const newProgress = ((currentStep + 1) / totalSteps) * 100;
 
-    // Animate title first
-    Animated.timing(titleFadeAnim, {
-      toValue: 1,
-      duration: 800,
-      useNativeDriver: true,
-    }).start(() => {
-      // After title animation, animate description lines with delay
-      const animations = descriptionFadeAnims.map((anim, index) =>
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 600,
-          delay: index * 200, // 200ms delay between each line
-          useNativeDriver: true,
-        })
-      );
-      Animated.stagger(200, animations).start();
+    // Update the progress with a spring animation
+    progressValue.value = withSpring(newProgress, {
+      damping: 20,
+      stiffness: 90,
     });
-  }, [screen.id]); // Re-run animation when screen changes
+
+    // Update the context values
+    updateProgress(newProgress);
+  }, [currentStep, totalSteps]);
+
+  const progressBarStyle = useAnimatedStyle(() => ({
+    width: `${progressValue.value}%`,
+  }));
 
   const dismissKeyboard = () => {
     Keyboard.dismiss();
@@ -396,9 +408,9 @@ export default function OnboardingScreen({
 
         {/* Progress bar */}
         <View className="h-0.5 bg-[#E4E2DD] mb-4">
-          <View
+          <Reanimated.View
             className="h-0.5 bg-[#A4A095]"
-            style={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
+            style={progressBarStyle}
           />
         </View>
 
@@ -406,7 +418,7 @@ export default function OnboardingScreen({
         <View className="flex-1 px-6">
           {/* Title section - positioned at 30% from top */}
           <View className="mt-[25%]">
-            {renderFormattedTitle(screen, titleFadeAnim)}
+            <AnimatedTitle screen={screen} />
             {screen.subtitle && (
               <Text className="text-lg text-center text-[#333] mt-4">
                 {screen.subtitle}
@@ -415,15 +427,14 @@ export default function OnboardingScreen({
           </View>
 
           {/* Description section */}
-          {renderFormattedDescription(screen, descriptionFadeAnims)}
+          <AnimatedDescription screen={screen} />
 
           {/* Children components */}
           <View className="mt-8 flex-1">{children}</View>
         </View>
 
-        {/* Bottom navigation - always at the bottom */}
+        {/* Bottom navigation */}
         <View className="w-full mb-6">
-          {/* Navigation buttons */}
           <View className="flex-row justify-between px-5">
             {showBackButton ? (
               <TouchableOpacity className="flex-1 py-4 px-6" onPress={onBack}>
