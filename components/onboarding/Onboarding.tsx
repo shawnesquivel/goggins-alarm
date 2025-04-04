@@ -9,6 +9,7 @@ import ProjectSetupScreen from "./ProjectSetupScreen";
 import TimerSetupScreen from "./TimerSetupScreen";
 import StartSessionScreen from "./StartSessionScreen";
 import TrialScreen from "./TrialScreen";
+import LoginScreen from "./LoginScreen";
 import { useRouter } from "expo-router";
 
 export default function Onboarding() {
@@ -73,6 +74,17 @@ export default function Onboarding() {
       case OnboardingScreenType.TRIAL:
         return (
           <TrialScreen
+            screen={currentScreen}
+            currentStep={currentScreenIndex}
+            totalSteps={totalScreens}
+            onNext={nextScreen}
+            onBack={previousScreen}
+          />
+        );
+
+      case OnboardingScreenType.LOGIN:
+        return (
+          <LoginScreen
             screen={currentScreen}
             currentStep={currentScreenIndex}
             totalSteps={totalScreens}

@@ -7,6 +7,7 @@ export enum OnboardingScreenType {
   CONCEPT = "concept",
   SETUP = "setup",
   TRIAL = "trial",
+  LOGIN = "login",
   START = "start",
 }
 
@@ -25,7 +26,7 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
   {
     id: "welcome1",
     type: OnboardingScreenType.WELCOME,
-    title: '"What do you *really* want?"',
+    title: '"What do you *really* want??"',
     description:
       "What is your dream?\n\nHow about A side hustle that makes $100K?\n\n100K followers on Instagram or TikTok?\n\nQuitting your job and starting your dream career.\n\nLet's do a short exercise.",
   },
@@ -83,6 +84,12 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
     title: "Start your free trial",
     description: "Free trial for 7 days, then $39.99/year ($3.33 per month)",
     action: "Start 7-Day Trial",
+  },
+  {
+    id: "login",
+    type: OnboardingScreenType.LOGIN,
+    title: "Sign in to your account",
+    description: "Create an account or sign in to continue",
   },
   {
     id: "setup2",

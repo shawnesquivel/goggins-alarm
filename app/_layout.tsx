@@ -13,6 +13,7 @@ import "../global.css";
 import { useColorScheme } from "@/components/useColorScheme";
 import { PomodoroProvider } from "@/contexts/AlarmContext";
 import { OnboardingProvider } from "@/contexts/OnboardingContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import {
   Figtree_400Regular,
   Figtree_500Medium,
@@ -52,11 +53,13 @@ export default function RootLayout() {
   // Wrap with providers and directly render the RootLayoutNav
   // No navigation decision-making in this component
   return (
-    <OnboardingProvider>
-      <PomodoroProvider>
-        <RootLayoutNav />
-      </PomodoroProvider>
-    </OnboardingProvider>
+    <AuthProvider>
+      <OnboardingProvider>
+        <PomodoroProvider>
+          <RootLayoutNav />
+        </PomodoroProvider>
+      </OnboardingProvider>
+    </AuthProvider>
   );
 }
 
@@ -77,6 +80,10 @@ function RootLayoutNav() {
         />
         <Stack.Screen
           name="onboarding"
+          options={{ presentation: "fullScreenModal" }}
+        />
+        <Stack.Screen
+          name="login"
           options={{ presentation: "fullScreenModal" }}
         />
       </Stack>

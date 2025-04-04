@@ -3,6 +3,7 @@ export default {
     name: "Deep Work Timer",
     slug: "deep-work-timer",
     userInterfaceStyle: "automatic",
+    scheme: "com.deepwork",
     extra: {
       openaiApiKey: process.env.OPENAI_API_KEY,
       supabaseUrl: process.env.REACT_NATIVE_SUPABASE_URL,
@@ -14,6 +15,13 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.deepwork",
+      infoPlist: {
+        CFBundleURLTypes: [
+          {
+            CFBundleURLSchemes: ["com.deepwork"],
+          },
+        ],
+      },
     },
   },
 };
