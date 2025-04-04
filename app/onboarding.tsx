@@ -18,8 +18,6 @@ export default function OnboardingScreen() {
     return null;
   }
 
-  // Render the onboarding UI
-  console.log("[OnboardingScreen] Rendering Onboarding component.");
   return (
     <View style={styles.container}>
       <Onboarding />

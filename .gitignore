@@ -36,3 +36,26 @@ yarn-error.*
 *.tsbuildinfo
 dev_docs
 .env
+
+# Android - ignore completely
+android/
+
+# iOS - selective ignoring
+ios/*
+!ios/GoogleService-Info.plist
+ios/Pods/
+ios/Podfile
+ios/Podfile.lock
+*.xcworkspace
+*.xcodeproj
+*.pbxproj
+*.storyboard
+*.swift
+*.mm
+*.h
+*.m
+*.entitlements
+*.xcprivacy
+*.xcsassets
+*.colorset
+*.appiconset

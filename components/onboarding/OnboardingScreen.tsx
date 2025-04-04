@@ -27,6 +27,10 @@ import {
   Figtree_700Bold,
 } from "@expo-google-fonts/figtree";
 
+// Create animated components once outside of the render functions
+const AnimatedText = Animated.createAnimatedComponent(Text);
+const AnimatedStyledText = Animated.createAnimatedComponent(StyledText);
+
 interface OnboardingScreenProps {
   screen: OnboardingScreenType;
 
@@ -61,9 +65,6 @@ const renderFormattedTitle = (
     lineHeight: 46,
     opacity: 0,
   };
-
-  const AnimatedText = Animated.createAnimatedComponent(Text);
-  const AnimatedStyledText = Animated.createAnimatedComponent(StyledText);
 
   const renderAnimatedText = (content: React.ReactNode) => (
     <AnimatedText
@@ -187,9 +188,6 @@ const renderFormattedDescription = (
     fontFamily: "Figtree_400Regular",
     opacity: 0,
   };
-
-  const AnimatedText = Animated.createAnimatedComponent(Text);
-  const AnimatedStyledText = Animated.createAnimatedComponent(StyledText);
 
   const renderAnimatedText = (content: React.ReactNode, index: number) => (
     <AnimatedText
@@ -429,7 +427,9 @@ export default function OnboardingScreen({
           <View className="flex-row justify-between px-5">
             {showBackButton ? (
               <TouchableOpacity className="flex-1 py-4 px-6" onPress={onBack}>
-                <Text className="text-base font-medium text-[#333] text-center">BACK</Text>
+                <Text className="text-base font-medium text-[#333] text-center">
+                  BACK
+                </Text>
               </TouchableOpacity>
             ) : (
               <View className="flex-1" />
