@@ -17,7 +17,7 @@ import * as Linking from "expo-linking";
 
 export default function Auth({ isOnboardingFlow = false }) {
   const router = useRouter();
-  const { nextScreen } = useOnboarding();
+  const { nextScreen, resetOnboarding } = useOnboarding();
 
   // Log Supabase configuration on mount
   useEffect(() => {
@@ -150,6 +150,11 @@ export default function Auth({ isOnboardingFlow = false }) {
     }
   };
 
+  const handleGoToOnboarding = () => {
+    resetOnboarding();
+    router.replace("/onboarding");
+  };
+
   return (
     <View className="mt-10 px-3 items-center">
       {/* Google Sign-In Button */}
@@ -181,6 +186,13 @@ export default function Auth({ isOnboardingFlow = false }) {
           <Text className="text-white font-medium">Sign in with Apple</Text>
         </TouchableOpacity>
       )}
+
+      {/* Go back to onboarding link */}
+      <TouchableOpacity className="mt-8" onPress={handleGoToOnboarding}>
+        <Text className="text-blue-500 text-center">
+          New to Deep Work? Start the tutorial again
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
