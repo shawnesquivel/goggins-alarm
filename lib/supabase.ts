@@ -35,3 +35,63 @@ AppState.addEventListener("change", (state) => {
     supabase.auth.stopAutoRefresh();
   }
 });
+
+// Helper functions for database operations
+export async function getCurrentUser() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  return user;
+}
+
+// Projects
+export async function getProjects() {
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
+
+// Sessions
+export async function getSessions(projectId?: string) {
+  let query = supabase
+    .from("sessions")
+    .select("*, project:projects(*)")
+    .order("created_at", { ascending: false });
+
+  if (projectId) {
+    query = query.eq("project_id", projectId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data;
+}
+
+// Periods
+export async function getPeriods(sessionId: string) {
+  const { data, error } = await supabase
+    .from("periods")
+    .select("*")
+    .eq("session_id", sessionId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return data;
+}
+
+// Analytics
+export async function getDailyAnalytics(startDate: Date, endDate: Date) {
+  const { data, error } = await supabase
+    .from("daily_analytics")
+    .select("*")
+    .gte("day", startDate.toISOString().split("T")[0])
+    .lte("day", endDate.toISOString().split("T")[0])
+    .order("day", { ascending: true });
+
+  if (error) throw error;
+  return data;
+}

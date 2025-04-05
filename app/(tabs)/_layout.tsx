@@ -76,6 +76,16 @@ export default function TabLayout() {
           tabBarShowLabel: true,
         }}
       />
+      <Tabs.Screen
+        name="db-test"
+        options={{
+          title: "DB Test",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="database" color={color} />
+          ),
+          tabBarShowLabel: true,
+        }}
+      />
     </Tabs>
   );
 }
