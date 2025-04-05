@@ -367,7 +367,8 @@ export default function OnboardingScreen({
   disableNext,
 }: OnboardingScreenProps) {
   const showBackButton = currentStep > 0 && onBack;
-  const { progress, previousProgress, updateProgress } = useOnboarding();
+  const { progress, previousProgress, updateProgress, completeOnboarding } =
+    useOnboarding();
 
   const progressValue = useSharedValue(progress);
   const previousProgressValue = useSharedValue(previousProgress);
@@ -399,11 +400,23 @@ export default function OnboardingScreen({
       <SafeAreaView className="flex-1 bg-[#F3F1EC]">
         <StatusBar barStyle="dark-content" />
 
-        {/* Header - version info */}
-        <View className="px-4 pt-2">
+        {/* Header - version info and skip button */}
+        <View className="px-4 pt-2 flex-row justify-between items-center">
           <Text className="text-xs text-[#999]">
             Sign Up Version {currentStep + 11}
           </Text>
+
+          {/* Skip to Home button - only shown on first screen */}
+          {currentStep === 0 && (
+            <TouchableOpacity
+              onPress={completeOnboarding}
+              className="py-1 px-3 bg-blue-500 rounded-full"
+            >
+              <Text className="text-xs text-white font-medium">
+                Skip to Home (Testing)
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Progress bar */}
