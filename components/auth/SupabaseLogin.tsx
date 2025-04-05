@@ -150,8 +150,9 @@ export default function Auth({ isOnboardingFlow = false }) {
     }
   };
 
-  const handleGoToOnboarding = () => {
-    resetOnboarding();
+  const handleGoToOnboarding = async () => {
+    console.log("Resetting onboarding flow...");
+    await resetOnboarding();
     router.replace("/onboarding");
   };
 

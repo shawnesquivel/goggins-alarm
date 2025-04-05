@@ -125,6 +125,8 @@ interface OnboardingContextType {
   progress: number;
   previousProgress: number;
   updateProgress: (progress: number) => void;
+  resetOnboarding: () => Promise<void>;
+  completeOnboarding: () => Promise<void>;
 }
 
 const OnboardingContext = createContext<OnboardingContextType>({
@@ -137,6 +139,8 @@ const OnboardingContext = createContext<OnboardingContextType>({
   progress: 0,
   previousProgress: 0,
   updateProgress: () => {},
+  resetOnboarding: async () => {},
+  completeOnboarding: async () => {},
 });
 
 export function OnboardingProvider({
@@ -233,6 +237,8 @@ export function OnboardingProvider({
         progress,
         previousProgress,
         updateProgress,
+        resetOnboarding,
+        completeOnboarding,
       }}
     >
       {children}
