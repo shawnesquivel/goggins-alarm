@@ -6,5 +6,5 @@ npx supabase db reset
 List functions
 
 
-
+np
 

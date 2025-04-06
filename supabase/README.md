@@ -1,6 +1,6 @@
-# Supabase Integration for Goggins Alarm
+# Supabase Integration for Deep Work Timer
 
-This directory contains Supabase configurations, database migrations, and serverless functions for the Goggins Alarm app.
+This directory contains Supabase configurations, database migrations, and serverless functions for the Deep Work Timer app.
 
 ## Structure
 

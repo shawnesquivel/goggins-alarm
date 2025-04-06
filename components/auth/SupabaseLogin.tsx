@@ -49,67 +49,57 @@ export default function Auth({ isOnboardingFlow = false }) {
 
   const signInWithGoogle = async () => {
     try {
-      console.log("Starting Google sign-in process");
-
-      // Determine proper redirect URL based on platform
       const redirectUrl = Platform.select({
         web: `${window.location.origin}/login-callback`,
         default: Linking.createURL("login-callback"),
       });
 
-      console.log("Using redirect URL:", redirectUrl);
-
-      // Try the OAuth flow
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: redirectUrl,
+          // Only skip browser redirect for development
+          skipBrowserRedirect: __DEV__,
         },
       });
 
-      console.log("OAuth response:", { data, error });
+      if (error) throw error;
+      if (!data?.url) throw new Error("No auth URL received");
 
-      if (error) {
-        console.error("OAuth error:", error);
-        Alert.alert("Error", error.message);
-      } else if (data?.url) {
-        console.log("Auth URL:", data.url);
-
-        // Handle differently based on platform
-        if (Platform.OS === "web") {
-          // For web, just navigate to the URL
-          window.location.href = data.url;
-        } else {
-          // For native, use the WebBrowser
-          try {
-            const result = await WebBrowser.openAuthSessionAsync(
-              data.url,
-              redirectUrl
-            );
-
-            console.log("Auth session result:", result);
-
-            if (result.type === "success") {
-              console.log("Auth success from browser");
-              const { data: sessionData } = await supabase.auth.getSession();
-
-              if (sessionData.session) {
-                if (isOnboardingFlow) {
-                  nextScreen();
-                } else {
-                  router.replace("/(tabs)");
-                }
-              }
-            }
-          } catch (browserError) {
-            console.error("Browser error:", browserError);
-            Alert.alert("Error", "Could not open the authentication page.");
+      if (Platform.OS === "web") {
+        window.location.href = data.url;
+      } else {
+        const result = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          redirectUrl,
+          {
+            showInRecents: true,
+            createTask: true,
           }
+        );
+
+        if (result.type === "success") {
+          // In production, you might want to implement retry logic
+          // instead of a fixed delay
+          const maxAttempts = 3;
+          for (let i = 0; i < maxAttempts; i++) {
+            const { data: sessionData } = await supabase.auth.getSession();
+            if (sessionData.session) {
+              return isOnboardingFlow
+                ? nextScreen()
+                : router.replace("/(tabs)");
+            }
+            await new Promise((resolve) => setTimeout(resolve, 500));
+          }
+          throw new Error("Failed to get session after successful auth");
         }
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Sign-in error:", error);
-      Alert.alert("Error", error.message || "Error during Google sign in");
+      Alert.alert(
+        "Authentication Error",
+        "Could not complete sign in. Please try again."
+      );
     }
   };
 

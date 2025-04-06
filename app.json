@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "goggins-alarm",
-    "slug": "goggins-alarm",
+    "name": "deepworktimer",
+    "slug": "deepworktimer",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "com.deepwork",
+    "scheme": "com.deepworktimer",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,12 +15,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.deepwork",
+      "bundleIdentifier": "com.deepworktimer",
       "infoPlist": {
         "UIBackgroundModes": ["audio", "remote-notification"],
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["com.deepwork"]
+            "CFBundleURLSchemes": ["com.deepworktimer"]
           }
         ]
       }
@@ -57,7 +57,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow Goggins Alarm to access your camera."
+          "cameraPermission": "Allow Deep Work Timer to access your camera."
         }
       ]
     ],

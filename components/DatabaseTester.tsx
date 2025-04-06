@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { supabase } from "@/lib/supabase";
+import Constants from "expo-constants";
 
 type TestResult = {
   name: string;
@@ -19,6 +20,7 @@ type TestResult = {
 const DatabaseTester = () => {
   const [results, setResults] = useState<TestResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [connectionInfo, setConnectionInfo] = useState<any>(null);
 
   // User ID from our seed data
   const testUserId = "22222222-2222-2222-2222-222222222222";
@@ -31,14 +33,128 @@ const DatabaseTester = () => {
     setResults([]);
   };
 
+  // Get connection info
+  const fetchConnectionInfo = async () => {
+    try {
+      // Get the Supabase URL from Constants
+      const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
+
+      // Try to get config from Supabase
+      const { data: config, error: configError } = await supabase.rpc(
+        "get_config_info"
+      );
+
+      setConnectionInfo({
+        supabaseUrl,
+        configInfo: config || "Not available",
+        configError: configError?.message,
+      });
+
+      addResult({
+        name: "Connection Info",
+        status: "success",
+        message: `Connected to: ${supabaseUrl}`,
+        data: {
+          url: supabaseUrl,
+          configInfo: config || "Not available",
+          error: configError?.message,
+        },
+      });
+    } catch (error) {
+      addResult({
+        name: "Connection Info",
+        status: "error",
+        message: `Error getting connection info: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      });
+    }
+  };
+
   const runAllTests = async () => {
     setIsLoading(true);
     clearResults();
 
     try {
-      // Test 1: Get all users
+      // Get connection info first
+      await fetchConnectionInfo();
+
+      // Test 0: Check schema completeness
       addResult({
-        name: "Fetching users",
+        name: "Checking schema completeness",
+        status: "pending",
+        message: "Starting...",
+      });
+
+      try {
+        const { data: schemaInfo, error: schemaError } = await supabase.rpc(
+          "check_schema_completeness"
+        );
+
+        if (schemaError) {
+          addResult({
+            name: "Checking schema completeness",
+            status: "error",
+            message: `Error: ${schemaError.message}`,
+          });
+        } else {
+          addResult({
+            name: "Checking schema completeness",
+            status: "success",
+            message: `Schema check complete`,
+            data: schemaInfo,
+          });
+        }
+      } catch (error) {
+        addResult({
+          name: "Checking schema completeness",
+          status: "error",
+          message: `Error checking schema: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+
+      // Test 0b: Check tables in the database
+      addResult({
+        name: "Listing available tables",
+        status: "pending",
+        message: "Starting...",
+      });
+
+      try {
+        const { data: tables, error: tablesError } = await supabase
+          .from("pg_tables")
+          .select("schemaname, tablename")
+          .eq("schemaname", "public");
+
+        if (tablesError) {
+          addResult({
+            name: "Listing available tables",
+            status: "error",
+            message: `Error: ${tablesError.message}`,
+          });
+        } else {
+          addResult({
+            name: "Listing available tables",
+            status: "success",
+            message: `Found ${tables?.length || 0} tables in public schema`,
+            data: tables,
+          });
+        }
+      } catch (error) {
+        addResult({
+          name: "Listing available tables",
+          status: "error",
+          message: `Error listing tables: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+
+      // Test 1: Get all users (no filters)
+      addResult({
+        name: "Fetching users (unfiltered)",
         status: "pending",
         message: "Starting...",
       });
@@ -48,55 +164,133 @@ const DatabaseTester = () => {
 
       if (usersError) {
         addResult({
-          name: "Fetching users",
+          name: "Fetching users (unfiltered)",
           status: "error",
           message: `Error: ${usersError.message}`,
         });
       } else {
         addResult({
-          name: "Fetching users",
+          name: "Fetching users (unfiltered)",
           status: "success",
           message: `Successfully fetched ${users.length} users`,
           data: users[0],
         });
       }
 
-      // Test 2: Get all projects with their associated user emails
+      // Test 1b: Get users with auth schema
       addResult({
-        name: "Fetching projects",
+        name: "Fetching auth.users",
         status: "pending",
         message: "Starting...",
       });
-      const { data: projects, error: projectsError } = await supabase.from(
-        "projects"
-      ).select(`
-          id,
-          name,
-          goal,
-          color,
-          users (
-            email
-          )
-        `);
+      try {
+        const { data: authUsers, error: authUsersError } = await supabase
+          .from("auth.users")
+          .select("*");
+
+        if (authUsersError) {
+          addResult({
+            name: "Fetching auth.users",
+            status: "error",
+            message: `Error: ${authUsersError.message}`,
+          });
+        } else {
+          addResult({
+            name: "Fetching auth.users",
+            status: "success",
+            message: `Successfully fetched ${authUsers.length} auth.users`,
+            data: authUsers[0],
+          });
+        }
+      } catch (error) {
+        addResult({
+          name: "Fetching auth.users",
+          status: "error",
+          message: `Error fetching auth.users: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+
+      // Test 2: Get all projects (no filters)
+      addResult({
+        name: "Fetching projects (unfiltered)",
+        status: "pending",
+        message: "Starting...",
+      });
+      const { data: projects, error: projectsError } = await supabase
+        .from("projects")
+        .select("*");
 
       if (projectsError) {
         addResult({
-          name: "Fetching projects",
+          name: "Fetching projects (unfiltered)",
           status: "error",
           message: `Error: ${projectsError.message}`,
         });
       } else {
         addResult({
-          name: "Fetching projects",
+          name: "Fetching projects (unfiltered)",
           status: "success",
           message: `Successfully fetched ${projects.length} projects`,
           data: projects[0],
         });
       }
 
-      // Test 3: Get completed sessions for a specific user
+      // Test 2b: Get projects with user_id filter
       addResult({
-        name: "Fetching sessions",
+        name: "Fetching projects by user_id",
+        status: "pending",
+        message: "Starting...",
+      });
+      const { data: userProjects, error: userProjectsError } = await supabase
+        .from("projects")
+        .select("*")
+        .eq("user_id", testUserId);
+
+      if (userProjectsError) {
+        addResult({
+          name: "Fetching projects by user_id",
+          status: "error",
+          message: `Error: ${userProjectsError.message}`,
+        });
+      } else {
+        addResult({
+          name: "Fetching projects by user_id",
+          status: "success",
+          message: `Successfully fetched ${userProjects.length} projects for user ${testUserId}`,
+          data: userProjects[0],
+        });
+      }
+
+      // Test 3: Get all sessions (no filters)
+      addResult({
+        name: "Fetching sessions (unfiltered)",
+        status: "pending",
+        message: "Starting...",
+      });
+      const { data: allSessions, error: allSessionsError } = await supabase
+        .from("sessions")
+        .select("*");
+
+      if (allSessionsError) {
+        addResult({
+          name: "Fetching sessions (unfiltered)",
+          status: "error",
+          message: `Error: ${allSessionsError.message}`,
+        });
+      } else {
+        addResult({
+          name: "Fetching sessions (unfiltered)",
+          status: "success",
+          message: `Successfully fetched ${allSessions.length} sessions total`,
+          data: allSessions[0],
+        });
+      }
+
+      // Test 3b: Get completed sessions for specific user
+      addResult({
+        name: "Fetching completed sessions for user",
         status: "pending",
         message: "Starting...",
       });
@@ -119,15 +313,15 @@ const DatabaseTester = () => {
 
       if (sessionsError) {
         addResult({
-          name: "Fetching sessions",
+          name: "Fetching completed sessions for user",
           status: "error",
           message: `Error: ${sessionsError.message}`,
         });
       } else {
         addResult({
-          name: "Fetching sessions",
+          name: "Fetching completed sessions for user",
           status: "success",
-          message: `Successfully fetched ${sessions.length} completed sessions`,
+          message: `Successfully fetched ${sessions.length} completed sessions for user ${testUserId}`,
           data: sessions[0],
         });
 
@@ -191,6 +385,79 @@ const DatabaseTester = () => {
               ? `Successfully fetched ${analytics.length} analytics records`
               : "No analytics records found - views may need to be refreshed",
           data: analytics[0],
+        });
+      }
+
+      // Test 6: Check RLS policies
+      addResult({
+        name: "Checking RLS policies",
+        status: "pending",
+        message: "Starting...",
+      });
+
+      try {
+        const { data: policies, error: policiesError } = await supabase.rpc(
+          "get_rls_policies"
+        );
+
+        if (policiesError) {
+          addResult({
+            name: "Checking RLS policies",
+            status: "error",
+            message: `Error: ${policiesError.message}`,
+          });
+        } else {
+          addResult({
+            name: "Checking RLS policies",
+            status: "success",
+            message: `Successfully fetched RLS policy information`,
+            data: policies,
+          });
+        }
+      } catch (error) {
+        addResult({
+          name: "Checking RLS policies",
+          status: "error",
+          message: `Error checking RLS policies: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        });
+      }
+
+      // Test 7: Get current authenticated user
+      addResult({
+        name: "Current authenticated user",
+        status: "pending",
+        message: "Starting...",
+      });
+
+      try {
+        const { data: authData, error: authError } =
+          await supabase.auth.getUser();
+
+        if (authError) {
+          addResult({
+            name: "Current authenticated user",
+            status: "error",
+            message: `Error: ${authError.message}`,
+          });
+        } else {
+          addResult({
+            name: "Current authenticated user",
+            status: "success",
+            message: authData?.user
+              ? `Authenticated as ${authData.user.email}`
+              : "No authenticated user",
+            data: authData?.user || "Not authenticated",
+          });
+        }
+      } catch (error) {
+        addResult({
+          name: "Current authenticated user",
+          status: "error",
+          message: `Error getting auth user: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
         });
       }
     } catch (error) {

@@ -4,15 +4,31 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
 import Constants from "expo-constants";
 
-// Access the variables through Constants.expoConfig.extra
-const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
-const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
+export function getSupabaseKeys() {
+  /**
+   * Fetch the keys from app.config
+   */
+  const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
+  const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error(
-    "Missing Supabase URL or anonymous key. Please check your environment variables."
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      "Missing Supabase URL or anonymous key. Please check your environment variables."
+    );
+  }
+
+  return { supabaseUrl, supabaseAnonKey };
+}
+if (__DEV__) {
+  console.log(
+    "Constants.expoConfig:",
+    JSON.stringify(Constants.expoConfig?.extra?.supabaseUrl, null, 2),
+    "Constants.expoConfig.extra.supabaseAnonKey:",
+    JSON.stringify(Constants.expoConfig?.extra?.supabaseAnonKey, null, 2)
   );
 }
+
+const { supabaseUrl, supabaseAnonKey } = getSupabaseKeys();
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
