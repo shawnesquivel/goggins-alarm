@@ -94,7 +94,10 @@ export default function ProjectsScreen() {
       </View>
       {item.goal && <Text style={styles.projectGoal}>Goal: {item.goal}</Text>}
       <Text style={styles.projectDate}>
-        Created: {item.createdAt.toLocaleDateString()}
+        Created:{" "}
+        {typeof item.createdAt === "object" && item.createdAt instanceof Date
+          ? item.createdAt.toLocaleDateString()
+          : new Date(item.createdAt).toLocaleDateString()}
       </Text>
     </View>
   );

@@ -177,7 +177,11 @@ const DashboardSummary = ({ userId }) => {
                 </td>
                 <td>{session.task}</td>
                 <td>{session.total_deep_work_minutes} min</td>
-                <td>{new Date(session.created_at).toLocaleDateString()}</td>
+                <td>
+                  {session.created_at
+                    ? new Date(session.created_at).toLocaleDateString()
+                    : "Unknown"}
+                </td>
                 <td>
                   <span className={`status-${session.status}`}>
                     {session.status.replace("_", " ")}
