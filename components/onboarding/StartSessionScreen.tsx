@@ -1,13 +1,5 @@
 import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  Modal,
-  Dimensions,
-} from "react-native";
+import { View, Text, TouchableOpacity, Modal } from "react-native";
 import { usePomodoro } from "@/contexts/AlarmContext";
 import OnboardingScreen from "./OnboardingScreen";
 import {
@@ -16,6 +8,8 @@ import {
 } from "@/contexts/OnboardingContext";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter } from "expo-router";
+import { ProjectService } from "@/services/ProjectService";
+import { Project } from "@/types/project";
 
 interface StartSessionScreenProps {
   screen: OnboardingScreenType;
@@ -25,8 +19,6 @@ interface StartSessionScreenProps {
   onBack?: () => void;
 }
 
-const { width, height } = Dimensions.get("window");
-
 export default function StartSessionScreen({
   screen,
   currentStep,
@@ -35,7 +27,7 @@ export default function StartSessionScreen({
   onBack,
 }: StartSessionScreenProps) {
   const router = useRouter();
-  const { projects, startFocusSession } = usePomodoro();
+  const { startFocusSession } = usePomodoro();
   const { completeOnboarding } = useOnboarding();
   const [taskDescription, setTaskDescription] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
@@ -43,6 +35,16 @@ export default function StartSessionScreen({
   const [isListening, setIsListening] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [projects, setProjects] = useState<Project[]>([]);
+
+  // Load projects from ProjectService
+  useEffect(() => {
+    const loadProjects = async () => {
+      const localProjects = await ProjectService.getLocalProjects();
+      setProjects(localProjects);
+    };
+    loadProjects();
+  }, []);
 
   // Initialize with first project if available
   useEffect(() => {
@@ -112,7 +114,7 @@ export default function StartSessionScreen({
 
   // Get project name by ID
   const getProjectName = (id: string): string => {
-    const project = projects.find((p) => p.id === id);
+    const project = projects.find((p: Project) => p.id === id);
     return project ? project.name : "Select Project";
   };
 
@@ -129,62 +131,67 @@ export default function StartSessionScreen({
       onNext={onNext}
       onBack={onBack}
     >
-      <View style={styles.container}>
-        <Text style={styles.titleText}>Begin with intention.</Text>
+      <View className="flex-1 items-center justify-center my-5">
+        <Text className="text-3xl font-bold text-center mb-12">
+          Begin with intention.
+        </Text>
 
         <TouchableOpacity
-          style={styles.micButton}
+          className="items-center"
           onPress={startVoiceRecognition}
         >
-          <View style={styles.micIconContainer}>
+          <View className="w-20 h-20 rounded-full bg-black justify-center items-center mb-3">
             <FontAwesome name="microphone" size={30} color="#fff" />
           </View>
-          <Text style={styles.micButtonText}>SET INTENTION</Text>
+          <Text className="text-base font-bold">SET INTENTION</Text>
         </TouchableOpacity>
 
         {/* Full-screen Modal */}
         <Modal visible={showModal} transparent={true} animationType="fade">
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
+          <View className="flex-1 bg-white/95">
+            <View className="flex-1 p-5">
               {isListening ? (
-                <View style={styles.listeningHeader}>
-                  <Text style={styles.listeningText}>LISTENING...</Text>
+                <View className="flex-row justify-between items-center py-4 border-b border-gray-200">
+                  <Text className="text-lg font-medium">LISTENING...</Text>
                   <TouchableOpacity
                     onPress={closeModal}
-                    style={styles.closeButton}
+                    className="w-8 h-8 rounded-full bg-gray-200 justify-center items-center"
                   >
-                    <Text style={styles.closeButtonText}>X</Text>
+                    <Text className="text-base font-bold">X</Text>
                   </TouchableOpacity>
                 </View>
               ) : (
-                <View style={styles.intentionForm}>
-                  <View style={styles.formRow}>
-                    <Text style={styles.formLabel}>I am working on</Text>
-                    <Text style={styles.formValue}>
+                <View className="flex-1 pt-16 px-5">
+                  <View className="mb-8">
+                    <Text className="text-lg text-gray-700 mb-1">
+                      I am working on
+                    </Text>
+                    <Text className="text-2xl font-bold border-b border-gray-300 pb-2 mt-1">
                       {taskDescription || "task"}
                     </Text>
                   </View>
 
-                  <View style={styles.formRow}>
-                    <Text style={styles.formLabel}>for</Text>
-                    <Text style={styles.formValue}>
+                  <View className="mb-8">
+                    <Text className="text-lg text-gray-700 mb-1">for</Text>
+                    <Text className="text-2xl font-bold border-b border-gray-300 pb-2 mt-1">
                       {getProjectName(selectedProjectId) || "project"}
                     </Text>
                   </View>
 
-                  <View style={styles.formRow}>
-                    <Text style={styles.formLabel}>for</Text>
-                    <Text style={styles.formValue}>
-                      {sessionDuration} minutes
+                  <View className="mb-8">
+                    <Text className="text-lg text-gray-700 mb-1">for</Text>
+                    <Text className="text-2xl font-bold border-b border-gray-300 pb-2 mt-1">
+                      {sessionDuration} minutes.
                     </Text>
-                    <Text style={styles.formEndPeriod}>.</Text>
                   </View>
 
                   <TouchableOpacity
-                    style={styles.startButton}
+                    className="bg-black rounded px-4 py-3.5 items-center mt-12"
                     onPress={handleStartSession}
                   >
-                    <Text style={styles.startButtonText}>START SESSION</Text>
+                    <Text className="text-white text-base font-bold">
+                      START SESSION
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -195,103 +202,3 @@ export default function StartSessionScreen({
     </OnboardingScreen>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    marginVertical: 20,
-  },
-  titleText: {
-    fontSize: 32,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 50,
-  },
-  micButton: {
-    alignItems: "center",
-  },
-  micIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  micButtonText: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-  },
-  modalContent: {
-    flex: 1,
-    padding: 20,
-  },
-  listeningHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  listeningText: {
-    fontSize: 18,
-    fontWeight: "500",
-  },
-  closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#eee",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  closeButtonText: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  intentionForm: {
-    flex: 1,
-    paddingTop: 60,
-    paddingHorizontal: 20,
-  },
-  formRow: {
-    marginBottom: 30,
-  },
-  formLabel: {
-    fontSize: 18,
-    color: "#333",
-    marginBottom: 5,
-  },
-  formValue: {
-    fontSize: 24,
-    fontWeight: "bold",
-    borderBottomWidth: 1,
-    borderBottomColor: "#ccc",
-    paddingBottom: 8,
-    marginTop: 5,
-  },
-  formEndPeriod: {
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  startButton: {
-    backgroundColor: "#000",
-    borderRadius: 4,
-    paddingVertical: 14,
-    alignItems: "center",
-    marginTop: 50,
-  },
-  startButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-});

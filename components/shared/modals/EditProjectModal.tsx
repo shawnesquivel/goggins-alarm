@@ -8,11 +8,9 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
-  Platform,
   Animated,
   Dimensions,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Project } from "@/types/project";
 import Svg, { Path } from "react-native-svg";
 

@@ -12,7 +12,6 @@ import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Project } from "@/types/project";
 import ProjectModal from "@/components/shared/modals/ProjectModal";
 import DeleteConfirmationModal from "@/components/shared/modals/DeleteConfirmationModal";
-import { v4 as uuidv4 } from "uuid";
 import { ProjectService } from "@/services/ProjectService";
 
 export default function ProjectsScreen() {
@@ -22,17 +21,6 @@ export default function ProjectsScreen() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | undefined>();
   const [projectToDelete, setProjectToDelete] = useState<string>("");
-
-  const colorOptions = [
-    "#4A90E2", // Blue
-    "#7ED321", // Green
-    "#F5A623", // Orange
-    "#D0021B", // Red
-    "#9013FE", // Purple
-    "#50E3C2", // Teal
-    "#BD10E0", // Pink
-    "#000000", // Black
-  ];
 
   const handleAddProject = () => {
     setSelectedProject(undefined);
