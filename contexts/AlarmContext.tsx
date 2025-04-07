@@ -33,7 +33,8 @@ interface PomodoroContextType {
   startFocusSession: (
     taskDescription: string,
     projectId: string,
-    tags: string[]
+    tags: string[],
+    customDuration?: number
   ) => void;
   pauseSession: () => void;
   resumeSession: () => void;
@@ -217,22 +218,27 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const startFocusSession = async (
     taskDescription: string,
     projectId: string,
-    tags: string[]
+    tags: string[],
+    customDuration?: number
   ) => {
-    // Create new session
+    // Create new session with either custom duration or default from settings
+    const duration =
+      customDuration !== undefined ? customDuration : settings.focusDuration;
+
     const newSession: PomodoroSession = {
       id: Date.now().toString(),
       taskDescription,
       projectId,
       startTime: new Date(),
-      duration: settings.focusDuration,
+      duration: duration,
       isCompleted: false,
       tags,
       type: "focus",
     };
 
     setCurrentSession(newSession);
-    setRemainingSeconds(settings.focusDuration * 60);
+    // Convert minutes to seconds (handle fractional minutes for short sessions)
+    setRemainingSeconds(Math.round(duration * 60));
     setTimerStatus(TimerStatus.RUNNING);
 
     // Save current session

@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { View, StyleSheet } from "react-native";
+import { View } from "react-native";
 import { useRouter, Redirect } from "expo-router";
 import Auth from "../components/auth/SupabaseLogin";
 import { useAuth } from "@/contexts/AuthContext";
@@ -37,15 +37,8 @@ export default function LoginScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <View className="flex-1 bg-white">
       <Auth />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-});

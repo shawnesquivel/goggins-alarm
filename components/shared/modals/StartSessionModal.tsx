@@ -7,7 +7,6 @@ import {
   ScrollView,
   Text as RNText,
 } from "react-native";
-import { Text } from "@/components/Themed";
 import { usePomodoro } from "@/contexts/AlarmContext";
 import { useProjects } from "@/contexts/ProjectContext";
 
@@ -30,6 +29,8 @@ export default function StartSessionModal({
   const [sessionDuration, setSessionDuration] = useState(25);
   const [isListening, setIsListening] = useState(false);
 
+  const sessionDurations = [0.167, 1, 5, 15, 25, 45, 60];
+
   useEffect(() => {
     if (projects.length > 0 && !selectedProjectId) {
       setSelectedProjectId(projects[0].id);
@@ -38,7 +39,7 @@ export default function StartSessionModal({
 
   const handleStartSession = () => {
     if (!taskDescription || !selectedProjectId) return;
-    startFocusSession(taskDescription, selectedProjectId, []);
+    startFocusSession(taskDescription, selectedProjectId, [], sessionDuration);
     if (onSessionStart) onSessionStart();
     onClose();
   };
@@ -48,6 +49,11 @@ export default function StartSessionModal({
     !selectedProjectId ||
     loading ||
     projects.length === 0;
+
+  const getDurationLabel = (duration: number): string => {
+    if (duration === 0.167) return "10s";
+    return `${duration}`;
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -105,12 +111,16 @@ export default function StartSessionModal({
             )}
 
             <RNText className="text-sm mb-2 text-black">Duration</RNText>
-            <View className="flex-row space-x-2 mb-4">
-              {[15, 25, 45].map((duration) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mb-4"
+            >
+              {sessionDurations.map((duration) => (
                 <TouchableOpacity
                   key={duration}
                   onPress={() => setSessionDuration(duration)}
-                  className={`flex-1 py-2 rounded ${
+                  className={`mr-2 px-4 py-2 rounded ${
                     sessionDuration === duration
                       ? "bg-black"
                       : "border border-gray-200"
@@ -121,11 +131,11 @@ export default function StartSessionModal({
                       sessionDuration === duration ? "text-white" : "text-black"
                     }`}
                   >
-                    {duration}
+                    {getDurationLabel(duration)}
                   </RNText>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           </View>
 
           <View className="flex-row border-t border-gray-100">

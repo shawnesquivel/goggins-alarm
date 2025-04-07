@@ -1,11 +1,13 @@
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import React, { useState, useEffect } from "react";
 import { usePomodoro } from "@/contexts/AlarmContext";
-import { Project, PomodoroSession } from "@/types/alarm";
+import { useProjects } from "@/contexts/ProjectContext";
+import { PomodoroSession } from "@/types/alarm";
 
 export default function ReportsScreen() {
-  const { projects, getSessionHistory, getTotalFocusTime, getProjectStats } =
+  const { getSessionHistory, getTotalFocusTime, getProjectStats } =
     usePomodoro();
+  const { projects } = useProjects();
   const [sessionHistory, setSessionHistory] = useState<PomodoroSession[]>([]);
   const [totalToday, setTotalToday] = useState(0);
   const [totalWeek, setTotalWeek] = useState(0);
@@ -44,9 +46,11 @@ export default function ReportsScreen() {
         { totalSessions: number; totalMinutes: number }
       > = {};
 
-      for (const project of projects) {
-        const projectStat = await getProjectStats(project.id);
-        stats[project.id] = projectStat;
+      if (projects && projects.length > 0) {
+        for (const project of projects) {
+          const projectStat = await getProjectStats(project.id);
+          stats[project.id] = projectStat;
+        }
       }
 
       setProjectStats(stats);
