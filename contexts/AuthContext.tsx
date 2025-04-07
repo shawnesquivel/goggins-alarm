@@ -37,12 +37,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Initial session check and subscription setup
   useEffect(() => {
-    console.log("AuthProvider initialized");
-
     const checkSession = async () => {
       try {
         setIsLoading(true);
-        console.log("Checking for existing session");
 
         // Get initial session
         const { data, error } = await supabase.auth.getSession();
@@ -50,7 +47,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error("Error getting session:", error);
         } else {
-          console.log("Initial session check:", !!data.session);
           setSession(data.session);
         }
       } catch (err) {

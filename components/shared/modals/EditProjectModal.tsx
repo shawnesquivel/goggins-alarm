@@ -8,11 +8,9 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
-  Platform,
   Animated,
   Dimensions,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { Project } from "@/types/project";
 import Svg, { Path } from "react-native-svg";
 
@@ -21,11 +19,7 @@ interface EditProjectModalProps {
   onClose: () => void;
   onSave: (name: string, goal: string, color: string) => void;
   onDelete: () => void;
-  project: {
-    name: string;
-    goal: string;
-    color: string;
-  };
+  project?: Project; // Make project optional and use Project type
   mode?: "add" | "edit";
 }
 
@@ -94,9 +88,16 @@ export default function EditProjectModal({
   }, [visible]);
 
   useEffect(() => {
-    setName(project.name);
-    setGoal(project.goal);
-    setSelectedColor(project.color || colors[0]);
+    if (project) {
+      setName(project.name || "");
+      setGoal(project.goal || "");
+      setSelectedColor(project.color || colors[0]);
+    } else {
+      // Set default values when no project is provided
+      setName("");
+      setGoal("");
+      setSelectedColor(colors[0]);
+    }
   }, [project]);
 
   const handleSave = () => {
@@ -127,92 +128,37 @@ export default function EditProjectModal({
   return (
     <Modal visible={visible} transparent animationType="none">
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={{ flex: 1 }}>
+        <View className="flex-1">
           {/* Animated Background */}
           <Animated.View
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "black",
-              opacity: fadeAnim,
-            }}
+            className="absolute inset-0 bg-black"
+            style={{ opacity: fadeAnim }}
           />
 
           {/* Animated Modal Content */}
           <Animated.View
-            style={{
-              flex: 1,
-              justifyContent: "flex-end",
-              transform: [{ translateY: slideAnim }],
-            }}
+            className="flex-1 justify-end"
+            style={{ transform: [{ translateY: slideAnim }] }}
           >
-            <View
-              style={{
-                backgroundColor: "white",
-                borderTopLeftRadius: 24,
-                borderTopRightRadius: 24,
-                padding: 24,
-                maxHeight: height * 0.9, // 90% of screen height max
-              }}
-            >
+            <View className="bg-white rounded-t-3xl p-6 max-h-[90%]">
               {/* Header */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: 24,
-                  position: "relative",
-                }}
-              >
+              <View className="flex-row justify-center items-center mb-6 relative">
                 {mode === "edit" && (
                   <TouchableOpacity
                     onPress={onDelete}
-                    style={{
-                      position: "absolute",
-                      left: -10,
-                      top: -10,
-                      width: 44,
-                      height: 44,
-                      justifyContent: "center",
-                      alignItems: "center",
-                    }}
+                    className="absolute -left-2.5 -top-2.5 w-11 h-11 justify-center items-center"
                   >
                     <DeleteIcon />
                   </TouchableOpacity>
                 )}
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: "600",
-                    color: "#000",
-                  }}
-                >
+                <Text className="text-base font-semibold text-black">
                   {mode === "add" ? "ADD PROJECT" : "EDIT PROJECT"}
                 </Text>
                 <TouchableOpacity
                   onPress={handleClose}
-                  style={{
-                    width: 44,
-                    height: 44,
-                    justifyContent: "center",
-                    alignItems: "center",
-                    position: "absolute",
-                    right: -10,
-                    top: -10,
-                  }}
+                  className="w-11 h-11 justify-center items-center absolute -right-2.5 -top-2.5"
                 >
-                  <Text
-                    style={{
-                      fontSize: 20,
-                      color: "#000",
-                    }}
-                  >
-                    ×
-                  </Text>
+                  <Text className="text-xl text-black">×</Text>
                 </TouchableOpacity>
               </View>
 
@@ -220,28 +166,12 @@ export default function EditProjectModal({
               <ScrollView keyboardShouldPersistTaps="handled">
                 <View>
                   {/* Project Name */}
-                  <View style={{ marginBottom: 24 }}>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: "600",
-                        marginBottom: 8,
-                        color: "#000",
-                      }}
-                    >
+                  <View className="mb-6">
+                    <Text className="text-sm font-semibold mb-2 text-black">
                       Project Name
                     </Text>
                     <TextInput
-                      style={{
-                        width: "100%",
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderRadius: 2,
-                        borderWidth: 1,
-                        borderColor: "#DDDAD0",
-                        fontSize: 16,
-                        color: "#000",
-                      }}
+                      className="w-full px-4 py-3 rounded border border-[#DDDAD0] text-base text-black"
                       placeholder="Project name"
                       value={name}
                       onChangeText={setName}
@@ -250,70 +180,41 @@ export default function EditProjectModal({
                   </View>
 
                   {/* Project Goal */}
-                  <View style={{ marginBottom: 24 }}>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: "600",
-                        marginBottom: 8,
-                        color: "#000",
-                      }}
-                    >
+                  <View className="mb-6">
+                    <Text className="text-sm font-semibold mb-2 text-black">
                       Project Goal
                     </Text>
                     <TextInput
-                      style={{
-                        width: "100%",
-                        height: 96,
-                        paddingHorizontal: 16,
-                        paddingVertical: 12,
-                        borderRadius: 2,
-                        borderWidth: 1,
-                        borderColor: "#DDDAD0",
-                        fontSize: 16,
-                        color: "#000",
-                        textAlignVertical: "top",
-                      }}
+                      className="w-full h-24 px-4 py-3 rounded border border-[#DDDAD0] text-base text-black"
                       placeholder="Describe your big goal for this project"
                       value={goal}
                       onChangeText={setGoal}
                       multiline
                       placeholderTextColor="#999"
+                      textAlignVertical="top"
                     />
                   </View>
 
                   {/* Color Selection */}
-                  <View style={{ marginBottom: 24 }}>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: "600",
-                        marginBottom: 8,
-                        color: "#000",
-                      }}
-                    >
+                  <View className="mb-6">
+                    <Text className="text-sm font-semibold mb-2 text-black">
                       Color
                     </Text>
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{
-                        paddingVertical: 8,
-                      }}
+                      className="py-2"
                     >
                       {colors.map((color) => (
                         <TouchableOpacity
                           key={color}
                           onPress={() => setSelectedColor(color)}
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 20,
-                            backgroundColor: color,
-                            marginRight: 12,
-                            borderWidth: selectedColor === color ? 2 : 0,
-                            borderColor: "#000",
-                          }}
+                          className={`w-10 h-10 rounded-full mr-3 ${
+                            selectedColor === color
+                              ? "border-2 border-black"
+                              : ""
+                          }`}
+                          style={{ backgroundColor: color }}
                         />
                       ))}
                     </ScrollView>
@@ -324,21 +225,9 @@ export default function EditProjectModal({
               {/* Save Button */}
               <TouchableOpacity
                 onPress={handleSave}
-                style={{
-                  backgroundColor: "#000",
-                  paddingVertical: 16,
-                  borderRadius: 8,
-                  alignItems: "center",
-                  marginTop: 24,
-                }}
+                className="bg-black py-4 rounded-lg items-center mt-6"
               >
-                <Text
-                  style={{
-                    color: "#fff",
-                    fontSize: 16,
-                    fontWeight: "600",
-                  }}
-                >
+                <Text className="text-white text-base font-semibold">
                   {mode === "add" ? "Add Project" : "Save Changes"}
                 </Text>
               </TouchableOpacity>

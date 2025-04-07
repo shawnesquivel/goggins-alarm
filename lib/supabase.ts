@@ -12,20 +12,16 @@ export function getSupabaseKeys() {
   const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    if (__DEV__) {
+      console.log({ supabaseUrl });
+      console.log({ supabaseAnonKey });
+    }
     throw new Error(
       "Missing Supabase URL or anonymous key. Please check your environment variables."
     );
   }
 
   return { supabaseUrl, supabaseAnonKey };
-}
-if (__DEV__) {
-  console.log(
-    "Constants.expoConfig:",
-    JSON.stringify(Constants.expoConfig?.extra?.supabaseUrl, null, 2),
-    "Constants.expoConfig.extra.supabaseAnonKey:",
-    JSON.stringify(Constants.expoConfig?.extra?.supabaseAnonKey, null, 2)
-  );
 }
 
 const { supabaseUrl, supabaseAnonKey } = getSupabaseKeys();
@@ -58,6 +54,57 @@ export async function getCurrentUser() {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
+}
+
+/**
+ * Creates a user profile in the public.users table for the authenticated user
+ * This should be called after successful authentication to ensure the foreign key
+ * constraint for projects and other related tables is satisfied
+ */
+export async function createUserProfile() {
+  try {
+    // Get the authenticated user
+    const user = await getCurrentUser();
+
+    if (!user) {
+      console.log("No authenticated user found");
+      return null;
+    }
+
+    // Check if a profile already exists for this user
+    const { data: existingProfile } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (existingProfile) {
+      console.log("User profile already exists:", existingProfile.id);
+      return existingProfile;
+    }
+
+    // Create a new profile
+    console.log("Creating user profile for:", user.id);
+    const { data, error } = await supabase
+      .from("users")
+      .insert({
+        id: user.id,
+        email: user.email,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error creating user profile:", error);
+      throw error;
+    }
+
+    console.log("User profile created successfully:", data.id);
+    return data;
+  } catch (error) {
+    console.error("Error in createUserProfile:", error);
+    throw error;
+  }
 }
 
 // Projects

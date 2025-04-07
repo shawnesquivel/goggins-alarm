@@ -8,7 +8,6 @@ import React, {
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   PomodoroSession,
-  Project,
   TimerSettings,
   Tag,
   TimerStatus,
@@ -34,20 +33,13 @@ interface PomodoroContextType {
   startFocusSession: (
     taskDescription: string,
     projectId: string,
-    tags: string[]
+    tags: string[],
+    customDuration?: number
   ) => void;
   pauseSession: () => void;
   resumeSession: () => void;
   completeSession: (rating?: "happy" | "sad", notes?: string) => void;
   startBreakSession: () => void;
-
-  // Project management
-  projects: Project[];
-  addProject: (
-    project: Omit<Project, "id" | "createdAt" | "updatedAt">
-  ) => void;
-  updateProject: (project: Project) => void;
-  deleteProject: (id: string) => void;
 
   // Tags
   tags: Tag[];
@@ -93,7 +85,6 @@ const PomodoroContext = createContext<PomodoroContextType | undefined>(
 
 export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   // State
-  const [projects, setProjects] = useState<Project[]>([]);
   const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
   const [settings, setSettings] = useState<TimerSettings>(DEFAULT_SETTINGS);
   const [currentSession, setCurrentSession] = useState<PomodoroSession | null>(
@@ -110,12 +101,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadSavedData = async () => {
       try {
-        // Load projects
-        const savedProjects = await AsyncStorage.getItem(STORAGE_KEYS.PROJECTS);
-        if (savedProjects) {
-          setProjects(JSON.parse(savedProjects));
-        }
-
         // Load tags
         const savedTags = await AsyncStorage.getItem(STORAGE_KEYS.TAGS);
         if (savedTags) {
@@ -233,22 +218,27 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const startFocusSession = async (
     taskDescription: string,
     projectId: string,
-    tags: string[]
+    tags: string[],
+    customDuration?: number
   ) => {
-    // Create new session
+    // Create new session with either custom duration or default from settings
+    const duration =
+      customDuration !== undefined ? customDuration : settings.focusDuration;
+
     const newSession: PomodoroSession = {
       id: Date.now().toString(),
       taskDescription,
       projectId,
       startTime: new Date(),
-      duration: settings.focusDuration,
+      duration: duration,
       isCompleted: false,
       tags,
       type: "focus",
     };
 
     setCurrentSession(newSession);
-    setRemainingSeconds(settings.focusDuration * 60);
+    // Convert minutes to seconds (handle fractional minutes for short sessions)
+    setRemainingSeconds(Math.round(duration * 60));
     setTimerStatus(TimerStatus.RUNNING);
 
     // Save current session
@@ -329,54 +319,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     // Start timer
     startTimer();
-  };
-
-  // Project management
-  const addProject = async (
-    projectData: Omit<Project, "id" | "createdAt" | "updatedAt">
-  ) => {
-    const newProject: Project = {
-      ...projectData,
-      id: Date.now().toString(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const updatedProjects = [...projects, newProject];
-    setProjects(updatedProjects);
-
-    // Save to storage
-    await AsyncStorage.setItem(
-      STORAGE_KEYS.PROJECTS,
-      JSON.stringify(updatedProjects)
-    );
-  };
-
-  const updateProject = async (updatedProject: Project) => {
-    const updatedProjects = projects.map((project) =>
-      project.id === updatedProject.id
-        ? { ...updatedProject, updatedAt: new Date() }
-        : project
-    );
-
-    setProjects(updatedProjects);
-
-    // Save to storage
-    await AsyncStorage.setItem(
-      STORAGE_KEYS.PROJECTS,
-      JSON.stringify(updatedProjects)
-    );
-  };
-
-  const deleteProject = async (id: string) => {
-    const updatedProjects = projects.filter((project) => project.id !== id);
-    setProjects(updatedProjects);
-
-    // Save to storage
-    await AsyncStorage.setItem(
-      STORAGE_KEYS.PROJECTS,
-      JSON.stringify(updatedProjects)
-    );
   };
 
   // Tag management
@@ -494,12 +436,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         resumeSession,
         completeSession,
         startBreakSession,
-
-        // Project management
-        projects,
-        addProject,
-        updateProject,
-        deleteProject,
 
         // Tags
         tags,

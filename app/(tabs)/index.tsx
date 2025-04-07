@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   ScrollView,
   TouchableOpacity,
   Dimensions,
@@ -20,6 +19,7 @@ import {
 } from "@expo-google-fonts/libre-caslon-text";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
+import { useProjects } from "@/contexts/ProjectContext";
 
 export default function TimerScreen() {
   const router = useRouter();
@@ -32,9 +32,9 @@ export default function TimerScreen() {
     completeSession,
     startBreakSession,
     settings,
-    projects,
   } = usePomodoro();
   const { session } = useAuth();
+  const { projects } = useProjects();
 
   const [fontsLoaded] = useFonts({
     LibreCaslonText_400Regular,
@@ -123,54 +123,53 @@ export default function TimerScreen() {
     if (!fontsLoaded) return null;
 
     return (
-      <View style={styles.fullScreenContainer}>
-        <View style={styles.fullScreenContent}>
-          <View style={styles.fullScreenHeader}>
-            <TouchableOpacity
-              style={styles.fullScreenCancelButton}
-              onPress={handleCancelSession}
-            >
+      <View className="absolute w-full h-full bg-black z-50 justify-center items-center">
+        <View className="w-full items-center justify-center p-5">
+          <View className="absolute top-10 right-5 z-10">
+            <TouchableOpacity className="p-2.5" onPress={handleCancelSession}>
               <FontAwesome name="times" size={24} color="#fff" />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.fullScreenTask}>
+          <Text className="text-xl font-medium text-white text-center mb-5">
             {currentSession?.taskDescription}
           </Text>
           <Text
-            style={[
-              styles.fullScreenTimer,
-              { fontFamily: "LibreCaslonText_400Regular" },
-            ]}
+            className="text-[96px] font-bold text-white tracking-wider mb-5"
+            style={{ fontFamily: "LibreCaslonText_400Regular" }}
           >
             {formatTimeDisplay(remainingSeconds)}
           </Text>
           {currentSession?.type === "focus" && (
             <>
-              <Text style={styles.fullScreenProject}>
+              <Text className="text-lg text-gray-300 mb-2.5">
                 {getProjectName(currentSession.projectId)}
               </Text>
               {getProjectGoal(currentSession.projectId) && (
-                <Text style={styles.fullScreenGoal}>
+                <Text className="text-base text-gray-400 italic mb-10">
                   Goal: {getProjectGoal(currentSession.projectId)}
                 </Text>
               )}
             </>
           )}
 
-          <View style={styles.fullScreenControls}>
+          <View className="items-center">
             <TouchableOpacity
-              style={styles.fullScreenButton}
+              className="bg-blue-500 px-8 py-4 rounded-lg mb-4 min-w-[200px] items-center"
               onPress={handleTimerControls}
             >
-              <Text style={styles.fullScreenButtonText}>{getButtonText()}</Text>
+              <Text className="text-white text-lg font-bold">
+                {getButtonText()}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.fullScreenButton, styles.exitButton]}
+              className="bg-white/20 px-8 py-4 rounded-lg min-w-[200px] items-center"
               onPress={() => setIsFullScreen(false)}
             >
-              <Text style={styles.fullScreenButtonText}>Exit Full Screen</Text>
+              <Text className="text-white text-lg font-bold">
+                Exit Full Screen
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -184,33 +183,37 @@ export default function TimerScreen() {
   const renderAuthDebug = () => {
     if (!session) {
       return (
-        <View style={styles.debugContainer}>
-          <Text style={styles.debugText}>Status: Not authenticated</Text>
+        <View className="p-2.5 m-2.5 bg-gray-100 rounded border border-gray-300">
+          <Text className="text-xs font-mono mb-1">
+            Status: Not authenticated
+          </Text>
           <TouchableOpacity
-            style={styles.debugButton}
+            className="mt-2 bg-red-400 p-1.5 rounded items-center"
             onPress={() => router.push("/login")}
           >
-            <Text style={styles.debugButtonText}>Go to Login</Text>
+            <Text className="text-white text-xs font-bold">Go to Login</Text>
           </TouchableOpacity>
         </View>
       );
     }
 
     return (
-      <View style={styles.debugContainer}>
-        <Text style={styles.debugText}>Status: Authenticated ✓</Text>
-        <Text style={styles.debugText}>User: {session.user.email}</Text>
-        <Text style={styles.debugText}>
+      <View className="p-2.5 m-2.5 bg-gray-100 rounded border border-gray-300">
+        <Text className="text-xs font-mono mb-1">Status: Authenticated ✓</Text>
+        <Text className="text-xs font-mono mb-1">
+          User: {session.user.email}
+        </Text>
+        <Text className="text-xs font-mono mb-1">
           ID: {session.user.id.substring(0, 8)}...
         </Text>
         <TouchableOpacity
-          style={styles.debugButton}
+          className="mt-2 bg-red-400 p-1.5 rounded items-center"
           onPress={async () => {
             await supabase.auth.signOut();
             router.replace("/login");
           }}
         >
-          <Text style={styles.debugButtonText}>Sign Out</Text>
+          <Text className="text-white text-xs font-bold">Sign Out</Text>
         </TouchableOpacity>
       </View>
     );
@@ -220,60 +223,64 @@ export default function TimerScreen() {
     <FullScreenTimer />
   ) : (
     <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
+      className="flex-1 bg-white"
+      contentContainerStyle={{ padding: 20 }}
     >
       {/* Auth Debug Panel (only in development mode) */}
       {__DEV__ && renderAuthDebug()}
 
       {/* Timer Display */}
-      <View style={styles.timerSection}>
+      <View className="items-center py-10">
         {currentSession ? (
           <>
-            <Text style={styles.taskText}>
+            <Text className="text-lg mb-5 text-center">
               {currentSession.taskDescription}
             </Text>
             <Text
-              style={[
-                styles.timerText,
-                { fontFamily: "LibreCaslonText_400Regular" },
-              ]}
+              className="text-[72px] font-bold mb-5"
+              style={{ fontFamily: "LibreCaslonText_400Regular" }}
             >
               {formatTimeDisplay(remainingSeconds)}
             </Text>
-            <Text style={styles.projectText}>
+            <Text className="text-base text-gray-500 mb-8">
               {getProjectName(currentSession.projectId)}
             </Text>
 
-            <View style={styles.controlsContainer}>
+            <View className="w-full gap-3">
               <TouchableOpacity
-                style={styles.controlButton}
+                className="bg-blue-500 py-3 px-6 rounded-lg items-center"
                 onPress={handleTimerControls}
               >
-                <Text style={styles.controlButtonText}>{getButtonText()}</Text>
+                <Text className="text-white text-base font-bold">
+                  {getButtonText()}
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.controlButton, styles.secondaryButton]}
+                className="bg-gray-500 py-3 px-6 rounded-lg items-center"
                 onPress={() => setIsFullScreen(true)}
               >
-                <Text style={styles.controlButtonText}>Full Screen</Text>
+                <Text className="text-white text-base font-bold">
+                  Full Screen
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.controlButton, styles.dangerButton]}
+                className="bg-red-500 py-3 px-6 rounded-lg items-center"
                 onPress={handleCancelSession}
               >
-                <Text style={styles.controlButtonText}>Cancel</Text>
+                <Text className="text-white text-base font-bold">Cancel</Text>
               </TouchableOpacity>
             </View>
           </>
         ) : (
           <TouchableOpacity
-            style={styles.startButton}
+            className="bg-blue-500 py-4 px-8 rounded-lg"
             onPress={() => setShowStartModal(true)}
           >
-            <Text style={styles.startButtonText}>Start Focus Session</Text>
+            <Text className="text-white text-lg font-bold">
+              Start Focus Session
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -291,42 +298,47 @@ export default function TimerScreen() {
         transparent={true}
         onRequestClose={() => setShowRatingModal(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>How was your focus session?</Text>
+        <View className="flex-1 bg-black/50 justify-center items-center">
+          <View className="bg-white rounded-xl p-6 w-[90%] max-w-[400px]">
+            <Text className="text-xl font-bold mb-4 text-center">
+              How was your focus session?
+            </Text>
 
-            <View style={styles.ratingContainer}>
+            <View className="flex-row justify-around mb-6">
               <TouchableOpacity
-                style={styles.ratingButton}
+                className="items-center p-2.5"
                 onPress={() => handleCompleteSession("happy")}
               >
                 <FontAwesome name="smile-o" size={32} color="#4CAF50" />
-                <Text style={styles.ratingText}>Productive</Text>
+                <Text className="text-base text-gray-600">Productive</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.ratingButton}
+                className="items-center p-2.5"
                 onPress={() => handleCompleteSession("sad")}
               >
                 <FontAwesome name="frown-o" size={32} color="#F44336" />
-                <Text style={styles.ratingText}>Distracted</Text>
+                <Text className="text-base text-gray-600">Distracted</Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.notesLabel}>Session Notes (optional):</Text>
+            <Text className="text-base text-gray-800 mb-2">
+              Session Notes (optional):
+            </Text>
             <TextInput
-              style={styles.notesInput}
+              className="border border-gray-300 rounded-lg p-3 text-base h-[100px] mb-4"
               multiline={true}
               value={sessionNotes}
               onChangeText={setSessionNotes}
               placeholder="What did you accomplish? What could be improved?"
+              textAlignVertical="top"
             />
 
             <TouchableOpacity
-              style={styles.submitButton}
+              className="py-2.5 items-center"
               onPress={() => handleCompleteSession()}
             >
-              <Text style={styles.submitButtonText}>Skip Rating</Text>
+              <Text className="text-gray-500 text-base">Skip Rating</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -339,26 +351,32 @@ export default function TimerScreen() {
         transparent={true}
         onRequestClose={() => setShowCancelConfirmation(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, styles.confirmationModal]}>
-            <Text style={styles.modalTitle}>Cancel Session?</Text>
-            <Text style={styles.confirmationText}>
+        <View className="flex-1 bg-black/50 justify-center items-center">
+          <View className="bg-white rounded-xl p-5 w-[90%] max-w-[400px]">
+            <Text className="text-xl font-bold mb-4 text-center">
+              Cancel Session?
+            </Text>
+            <Text className="text-base text-gray-600 mb-6 text-center">
               Are you sure you want to cancel your current focus session?
             </Text>
 
-            <View style={styles.confirmationButtons}>
+            <View className="flex-row justify-between">
               <TouchableOpacity
-                style={[styles.confirmButton, styles.cancelButton]}
+                className="flex-1 py-3 rounded-lg items-center mx-2 bg-gray-100"
                 onPress={() => setShowCancelConfirmation(false)}
               >
-                <Text style={styles.confirmButtonText}>No, Keep Going</Text>
+                <Text className="text-gray-800 text-base font-medium">
+                  No, Keep Going
+                </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.confirmButton, styles.confirmCancelButton]}
+                className="flex-1 py-3 rounded-lg items-center mx-2 bg-red-500"
                 onPress={confirmCancelSession}
               >
-                <Text style={styles.confirmButtonText}>Yes, Cancel</Text>
+                <Text className="text-white text-base font-medium">
+                  Yes, Cancel
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -367,245 +385,3 @@ export default function TimerScreen() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  contentContainer: {
-    padding: 20,
-  },
-  timerSection: {
-    alignItems: "center",
-    paddingVertical: 40,
-  },
-  taskText: {
-    fontSize: 18,
-    marginBottom: 20,
-    textAlign: "center",
-  },
-  timerText: {
-    fontSize: 72,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
-  projectText: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 30,
-  },
-  controlsContainer: {
-    width: "100%",
-    gap: 12,
-  },
-  controlButton: {
-    backgroundColor: "#4A90E2",
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  secondaryButton: {
-    backgroundColor: "#666",
-  },
-  dangerButton: {
-    backgroundColor: "#FF3B30",
-  },
-  controlButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  startButton: {
-    backgroundColor: "#4A90E2",
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-  },
-  startButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 24,
-    width: "90%",
-    maxWidth: 400,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 16,
-    textAlign: "center",
-  },
-  ratingContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    marginBottom: 24,
-  },
-  ratingButton: {
-    alignItems: "center",
-    padding: 10,
-  },
-  ratingText: {
-    fontSize: 16,
-    color: "#666",
-  },
-  notesLabel: {
-    fontSize: 16,
-    color: "#333",
-    marginBottom: 8,
-  },
-  notesInput: {
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    height: 100,
-    textAlignVertical: "top",
-    marginBottom: 16,
-  },
-  submitButton: {
-    paddingVertical: 10,
-    alignItems: "center",
-  },
-  submitButtonText: {
-    color: "#999",
-    fontSize: 16,
-  },
-  fullScreenContainer: {
-    position: "absolute",
-    width: Dimensions.get("window").width,
-    height: Dimensions.get("window").height,
-    backgroundColor: "#000",
-    zIndex: 1000,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  fullScreenContent: {
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 20,
-  },
-  fullScreenHeader: {
-    position: "absolute",
-    top: 40,
-    right: 20,
-    zIndex: 10,
-  },
-  fullScreenCancelButton: {
-    padding: 10,
-  },
-  fullScreenTask: {
-    fontSize: 20,
-    fontWeight: "500",
-    color: "#fff",
-    textAlign: "center",
-    marginBottom: 20,
-  },
-  fullScreenTimer: {
-    fontSize: 96,
-    fontWeight: "bold",
-    color: "#fff",
-    letterSpacing: 2,
-    marginBottom: 20,
-  },
-  fullScreenProject: {
-    fontSize: 18,
-    color: "#aaa",
-    marginBottom: 10,
-  },
-  fullScreenGoal: {
-    fontSize: 16,
-    color: "#888",
-    fontStyle: "italic",
-    marginBottom: 40,
-  },
-  fullScreenControls: {
-    alignItems: "center",
-  },
-  fullScreenButton: {
-    backgroundColor: "#4A90E2",
-    paddingHorizontal: 30,
-    paddingVertical: 15,
-    borderRadius: 8,
-    marginBottom: 16,
-    minWidth: 200,
-    alignItems: "center",
-  },
-  fullScreenButtonText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  exitButton: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  debugContainer: {
-    padding: 10,
-    margin: 10,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  debugText: {
-    fontSize: 12,
-    fontFamily: "monospace",
-    marginBottom: 4,
-  },
-  debugButton: {
-    marginTop: 8,
-    backgroundColor: "#ff6b6b",
-    padding: 6,
-    borderRadius: 4,
-    alignItems: "center",
-  },
-  debugButtonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  confirmationModal: {
-    padding: 20,
-  },
-  confirmationText: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 24,
-    textAlign: "center",
-  },
-  confirmationButtons: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  confirmButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 8,
-  },
-  cancelButton: {
-    backgroundColor: "#f1f1f1",
-  },
-  confirmCancelButton: {
-    backgroundColor: "#FF3B30",
-  },
-  confirmButtonText: {
-    color: "#333",
-    fontSize: 16,
-    fontWeight: "500",
-  },
-});

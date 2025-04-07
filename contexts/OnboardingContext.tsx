@@ -160,10 +160,8 @@ export function OnboardingProvider({
       try {
         const value = await AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY);
         if (value === "true") {
-          console.log("[OnboardingContext] Onboarding previously completed.");
           setIsOnboarding(false);
         } else {
-          console.log("[OnboardingContext] Onboarding not completed.");
           setIsOnboarding(true);
         }
       } catch (error) {
@@ -173,9 +171,6 @@ export function OnboardingProvider({
         );
         setIsOnboarding(true);
       } finally {
-        console.log(
-          "[OnboardingContext] Finished check, setting isLoading false."
-        );
         setIsLoading(false);
       }
     };

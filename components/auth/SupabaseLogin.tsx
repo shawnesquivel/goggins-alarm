@@ -1,13 +1,13 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Alert,
   Platform,
   TouchableOpacity,
   Text,
-  Linking as RNLinking,
+  TextInput,
 } from "react-native";
-import { supabase } from "../../lib/supabase";
+import { supabase, createUserProfile } from "../../lib/supabase";
 import { useRouter } from "expo-router";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import * as WebBrowser from "expo-web-browser";
@@ -18,6 +18,10 @@ import * as Linking from "expo-linking";
 export default function Auth({ isOnboardingFlow = false }) {
   const router = useRouter();
   const { nextScreen, resetOnboarding } = useOnboarding();
+  const [email, setEmail] = useState("shawnesquivel24@gmail.com");
+  const [password, setPassword] = useState("password");
+  const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<"signin" | "signup">("signup");
 
   // Log Supabase configuration on mount
   useEffect(() => {
@@ -41,11 +45,106 @@ export default function Auth({ isOnboardingFlow = false }) {
     if (!isOnboardingFlow) {
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-          router.replace("/(tabs)");
+          // Create user profile if needed, then navigate
+          createUserProfile()
+            .then(() => {
+              router.replace("/(tabs)");
+            })
+            .catch((err) => {
+              console.error("Error creating user profile:", err);
+              // Still navigate even if profile creation fails
+              router.replace("/(tabs)");
+            });
         }
       });
     }
   }, [router, isOnboardingFlow]);
+
+  // Helper function to handle post-auth steps
+  const handleSuccessfulAuth = async () => {
+    try {
+      // Try to create user profile
+      await createUserProfile();
+
+      // Navigate based on flow
+      if (isOnboardingFlow) {
+        nextScreen();
+      } else {
+        router.replace("/(tabs)");
+      }
+    } catch (error) {
+      console.error("Error in post-authentication steps:", error);
+      // Still continue with navigation
+      if (isOnboardingFlow) {
+        nextScreen();
+      } else {
+        router.replace("/(tabs)");
+      }
+    }
+  };
+
+  const handleEmailSignIn = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter both email and password");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      console.log("Signed in with email:", data.user?.email);
+      await handleSuccessfulAuth();
+    } catch (error: any) {
+      console.error("Email sign-in error:", error);
+      Alert.alert(
+        "Sign In Error",
+        error.message || "Could not sign in with email. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailSignUp = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter both email and password");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data.user?.identities?.length === 0) {
+        Alert.alert(
+          "Email Confirmation",
+          "A confirmation email has been sent. Please check your inbox."
+        );
+      } else {
+        console.log("Signed up with email:", data.user?.email);
+        await handleSuccessfulAuth();
+      }
+    } catch (error: any) {
+      console.error("Email sign-up error:", error);
+      Alert.alert(
+        "Sign Up Error",
+        error.message || "Could not sign up with email. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const signInWithGoogle = async () => {
     try {
@@ -53,6 +152,9 @@ export default function Auth({ isOnboardingFlow = false }) {
         web: `${window.location.origin}/login-callback`,
         default: Linking.createURL("login-callback"),
       });
+
+      console.log("Starting Google sign-in with redirect URL:", redirectUrl);
+      console.log("Supabase URL:", Constants.expoConfig?.extra?.supabaseUrl);
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -78,6 +180,8 @@ export default function Auth({ isOnboardingFlow = false }) {
           }
         );
 
+        console.log("Auth session result:", result);
+
         if (result.type === "success") {
           // In production, you might want to implement retry logic
           // instead of a fixed delay
@@ -85,9 +189,9 @@ export default function Auth({ isOnboardingFlow = false }) {
           for (let i = 0; i < maxAttempts; i++) {
             const { data: sessionData } = await supabase.auth.getSession();
             if (sessionData.session) {
-              return isOnboardingFlow
-                ? nextScreen()
-                : router.replace("/(tabs)");
+              // Create user profile after successful auth
+              await handleSuccessfulAuth();
+              return;
             }
             await new Promise((resolve) => setTimeout(resolve, 500));
           }
@@ -103,84 +207,119 @@ export default function Auth({ isOnboardingFlow = false }) {
     }
   };
 
-  // Apple sign-in unchanged
-  const signInWithApple = async () => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "apple",
-        options: {
-          redirectTo: "com.deepwork://login-callback",
-        },
-      });
-
-      if (error) {
-        Alert.alert("Error", error.message);
-      } else if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(
-          data.url,
-          "com.deepwork://login-callback"
-        );
-
-        if (result.type === "success") {
-          // Handle successful authentication
-          const { data: sessionData } = await supabase.auth.getSession();
-
-          if (sessionData.session) {
-            if (isOnboardingFlow) {
-              nextScreen();
-            } else {
-              router.replace("/(tabs)");
-            }
-          }
-        }
-      }
-    } catch (error: any) {
-      Alert.alert("Error", error.message || "Error during Apple sign in");
-      console.error(error);
-    }
-  };
-
   const handleGoToOnboarding = async () => {
     console.log("Resetting onboarding flow...");
     await resetOnboarding();
     router.replace("/onboarding");
   };
 
+  // Render the email auth form
+  const renderEmailForm = () => {
+    // Use an actual form element on web for better accessibility
+    const EmailForm = Platform.OS === "web" ? "form" : View;
+    const formProps =
+      Platform.OS === "web"
+        ? {
+            onSubmit: (e: any) => {
+              e.preventDefault();
+              mode === "signin" ? handleEmailSignIn() : handleEmailSignUp();
+            },
+            className: "w-full max-w-md",
+          }
+        : { className: "w-full max-w-md" };
+
+    return (
+      <EmailForm {...formProps}>
+        <Text className="text-2xl font-bold text-center text-gray-800 mb-6">
+          {mode === "signin" ? "Welcome Back" : "Create Account"}
+        </Text>
+
+        <View className="mb-4">
+          <TextInput
+            className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-800"
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete={Platform.OS === "web" ? "email" : "email"}
+            editable={!loading}
+          />
+        </View>
+
+        <View className="mb-6">
+          <TextInput
+            className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-800"
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoComplete={
+              Platform.OS === "web" ? "current-password" : "password"
+            }
+            editable={!loading}
+          />
+        </View>
+
+        <TouchableOpacity
+          className={`w-full bg-blue-600 py-3 px-4 rounded-lg items-center mb-4 ${
+            loading ? "opacity-70" : ""
+          }`}
+          onPress={mode === "signin" ? handleEmailSignIn : handleEmailSignUp}
+          disabled={loading}
+        >
+          <Text className="text-white font-semibold text-base">
+            {loading
+              ? "Please wait..."
+              : mode === "signin"
+              ? "Sign In"
+              : "Sign Up"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => setMode(mode === "signin" ? "signup" : "signin")}
+          className="mb-6"
+        >
+          <Text className="text-blue-600 text-center text-sm">
+            {mode === "signin"
+              ? "Need an account? Sign Up"
+              : "Already have an account? Sign In"}
+          </Text>
+        </TouchableOpacity>
+      </EmailForm>
+    );
+  };
+
   return (
-    <View className="mt-10 px-3 items-center">
+    <View className="w-full px-6 items-center">
+      {/* Email Authentication Form */}
+      {renderEmailForm()}
+
+      {/* Divider */}
+      <View className="w-full max-w-md flex-row items-center my-6">
+        <View className="flex-1 h-px bg-gray-300" />
+        <Text className="mx-4 text-gray-500 font-medium">OR</Text>
+        <View className="flex-1 h-px bg-gray-300" />
+      </View>
+
       {/* Google Sign-In Button */}
       <TouchableOpacity
-        className="bg-white py-3 px-4 rounded-lg border border-gray-300 mb-4 flex-row items-center w-64 justify-center"
+        className="w-full max-w-md bg-white py-3 px-4 rounded-lg border border-gray-300 mb-8 flex-row items-center justify-center"
         onPress={signInWithGoogle}
       >
         <FontAwesome
           name="google"
-          size={24}
+          size={20}
           color="#4285F4"
           style={{ marginRight: 12 }}
         />
-        <Text className="text-gray-800 font-medium">Sign in with Google</Text>
+        <Text className="text-gray-800 font-medium">Continue with Google</Text>
       </TouchableOpacity>
 
-      {/* Apple Sign-In Button (shown only on iOS) */}
-      {Platform.OS === "ios" && (
-        <TouchableOpacity
-          className="bg-black py-3 px-4 rounded-lg mb-4 flex-row items-center w-64 justify-center"
-          onPress={signInWithApple}
-        >
-          <FontAwesome
-            name="apple"
-            size={24}
-            color="white"
-            style={{ marginRight: 12 }}
-          />
-          <Text className="text-white font-medium">Sign in with Apple</Text>
-        </TouchableOpacity>
-      )}
-
       {/* Go back to onboarding link */}
-      <TouchableOpacity className="mt-8" onPress={handleGoToOnboarding}>
-        <Text className="text-blue-500 text-center">
+      <TouchableOpacity onPress={handleGoToOnboarding}>
+        <Text className="text-blue-500 text-center text-sm">
           New to Deep Work? Start the tutorial again
         </Text>
       </TouchableOpacity>
