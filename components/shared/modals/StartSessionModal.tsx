@@ -71,7 +71,7 @@ export default function StartSessionModal({
       <View className="flex-1 justify-center items-center px-4 bg-black/80">
         <View className="w-full max-w-xs bg-white rounded-lg">
           <RNText className="text-lg font-medium text-center py-4 text-black">
-            Start Focus Session
+            Start Deep Work Session
           </RNText>
 
           <View className="px-4 py-3">

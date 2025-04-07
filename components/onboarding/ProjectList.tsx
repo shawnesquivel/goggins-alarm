@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  SafeAreaView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import ProjectModal from "../shared/modals/ProjectModal";
@@ -134,8 +135,22 @@ export default function ProjectList() {
   }
 
   return (
-    <View className="flex-1 w-full">
-      <ScrollView className="flex-1">
+    <SafeAreaView className="flex-1 bg-[#f5f5f0] px-4 py-2">
+      {/* Header */}
+      <View className="mb-4">
+        <Text className="text-sm text-gray-600 uppercase">
+          ACCOUNT SETTINGS
+        </Text>
+        <Text className="text-4xl font-bold italic">Projects List</Text>
+      </View>
+
+      {/* Instructions */}
+      <Text className="text-blue-600 mb-6">
+        Click to edit a project, or add up to 10 projects at a time.
+      </Text>
+
+      {/* Projects List */}
+      <ScrollView className="flex-1 mb-4">
         {projects.map((project) => (
           <TouchableOpacity
             key={project.id}
@@ -143,49 +158,49 @@ export default function ProjectList() {
               console.log("Project TouchableOpacity pressed:", project);
               handleEditProject(project);
             }}
-            className="flex-row items-center p-4 rounded-lg mb-3"
+            className="flex-row items-center mb-4"
             activeOpacity={0.7}
           >
             <View
-              className="w-5 h-5 rounded-full mr-3 border border-black"
+              className="w-5 h-5 rounded-full mr-3 border border-gray-400"
               style={{ backgroundColor: project.color || "#ccc" }}
             />
-            <View className="flex-1">
-              <Text
-                style={{ fontFamily: "Figtree_500Medium" }}
-                className="text-base"
-              >
-                {project.name}
-              </Text>
-              {project.goal && (
-                <Text
-                  style={{ fontFamily: "Figtree_400Regular" }}
-                  className="text-sm text-[#666]"
-                >
-                  {project.goal}
-                </Text>
-              )}
-            </View>
+            <Text className="text-base">{project.name}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
+      {/* Add Project Button */}
       <TouchableOpacity
         onPress={() => {
           setSelectedProject(null);
           setIsModalVisible(true);
         }}
-        className="flex-row items-center justify-center py-4 rounded-lg mt-4"
+        className="items-center py-3 mb-6"
       >
-        <Ionicons name="add" size={24} color="black" />
-        <Text
-          style={{ fontFamily: "Figtree_500Medium" }}
-          className="text-black ml-2 text-lg"
-        >
-          Add Another Project
-        </Text>
+        <Text className="text-black text-center">+ Add Project</Text>
       </TouchableOpacity>
 
+      {/* Save and Cancel Buttons */}
+      <View className="mb-6 space-y-3">
+        <TouchableOpacity
+          className="bg-black py-4 items-center rounded-md"
+          onPress={() => console.log("Save List")}
+        >
+          <Text className="text-white uppercase font-medium">Save List</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className="py-3 items-center"
+          onPress={() => console.log("Return without saving")}
+        >
+          <Text className="text-black uppercase text-sm">
+            Return without saving
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Modal for adding/editing projects */}
       <ProjectModal
         visible={isModalVisible}
         onClose={() => {
@@ -202,6 +217,6 @@ export default function ProjectList() {
         }
         mode={selectedProject ? "edit" : "add"}
       />
-    </View>
+    </SafeAreaView>
   );
 }
