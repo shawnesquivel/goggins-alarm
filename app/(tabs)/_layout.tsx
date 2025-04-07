@@ -77,12 +77,10 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="db-test"
+        name="project-test"
         options={{
-          title: "DB Test",
-          tabBarIcon: ({ color }) => (
-            <TabBarIcon name="database" color={color} />
-          ),
+          title: "Project Test",
+          tabBarIcon: ({ color }) => <TabBarIcon name="flask" color={color} />,
           tabBarShowLabel: true,
         }}
       />

@@ -1,10 +1,9 @@
 # Supabase
 
-Reset local
+## Reset local
 npx supabase db reset
+npx supabas functions list
 
-List functions
 
-
-np
-
+## Generate Types
+npx supabase gen types --lang=typescript --local > types/database.types.ts

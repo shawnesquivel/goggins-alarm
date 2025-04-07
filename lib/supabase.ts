@@ -12,20 +12,16 @@ export function getSupabaseKeys() {
   const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
 
   if (!supabaseUrl || !supabaseAnonKey) {
+    if (__DEV__) {
+      console.log({ supabaseUrl });
+      console.log({ supabaseAnonKey });
+    }
     throw new Error(
       "Missing Supabase URL or anonymous key. Please check your environment variables."
     );
   }
 
   return { supabaseUrl, supabaseAnonKey };
-}
-if (__DEV__) {
-  console.log(
-    "Constants.expoConfig:",
-    JSON.stringify(Constants.expoConfig?.extra?.supabaseUrl, null, 2),
-    "Constants.expoConfig.extra.supabaseAnonKey:",
-    JSON.stringify(Constants.expoConfig?.extra?.supabaseAnonKey, null, 2)
-  );
 }
 
 const { supabaseUrl, supabaseAnonKey } = getSupabaseKeys();
