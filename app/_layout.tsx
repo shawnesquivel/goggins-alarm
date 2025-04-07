@@ -19,7 +19,7 @@ import {
   Figtree_500Medium,
 } from "@expo-google-fonts/figtree";
 import { LibreBaskerville_400Regular } from "@expo-google-fonts/libre-baskerville";
-
+import { ProjectProvider } from "@/contexts/ProjectContext";
 export {
   // Catch any errors thrown by the Layout component.
   ErrorBoundary,
@@ -55,9 +55,11 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <OnboardingProvider>
-        <PomodoroProvider>
-          <RootLayoutNav />
-        </PomodoroProvider>
+        <ProjectProvider>
+          <PomodoroProvider>
+            <RootLayoutNav />
+          </PomodoroProvider>
+        </ProjectProvider>
       </OnboardingProvider>
     </AuthProvider>
   );

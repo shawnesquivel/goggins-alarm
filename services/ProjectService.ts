@@ -92,6 +92,7 @@ export const ProjectService = {
   async createProject(
     projectData: Omit<Project, "id" | "createdAt" | "updatedAt">
   ): Promise<Project> {
+    // Generate new project with UUID
     const newProject = {
       ...projectData,
       id: this.generateUUID(), // Use UUID instead of timestamp
@@ -105,12 +106,65 @@ export const ProjectService = {
       newProject,
     ]);
 
-    // Add to pending operations
-    await this.addPendingOperation({
-      type: "insert",
-      data: newProject,
-      timestamp: Date.now(),
-    });
+    // Try to create in Supabase directly first
+    try {
+      // Get authenticated user
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+
+      if (user) {
+        console.log("Creating project with user ID:", user.id);
+
+        // Format data for database
+        const dbProject = {
+          id: newProject.id,
+          name: newProject.name,
+          goal: newProject.goal,
+          color: newProject.color,
+          user_id: user.id,
+          created_at: newProject.createdAt.toISOString(),
+          updated_at: newProject.updatedAt.toISOString(),
+        };
+
+        const { data, error } = await supabase
+          .from("projects")
+          .insert(dbProject)
+          .select();
+
+        if (error) {
+          console.error(
+            "Direct insert failed, adding to pending operations:",
+            error
+          );
+          // Fall back to pending operations
+          await this.addPendingOperation({
+            type: "insert",
+            data: newProject,
+            timestamp: Date.now(),
+          });
+        } else {
+          console.log("Project created successfully in Supabase:", data);
+        }
+      } else {
+        console.warn(
+          "No authenticated user found, adding to pending operations"
+        );
+        // Add to pending operations if no user is found
+        await this.addPendingOperation({
+          type: "insert",
+          data: newProject,
+          timestamp: Date.now(),
+        });
+      }
+    } catch (error) {
+      console.error("Error creating project in Supabase:", error);
+      // Add to pending operations
+      await this.addPendingOperation({
+        type: "insert",
+        data: newProject,
+        timestamp: Date.now(),
+      });
+    }
 
     return newProject;
   },
@@ -132,10 +186,18 @@ export const ProjectService = {
 
     // Try to update in Supabase
     try {
-      // Convert to DB format
+      // Get authenticated user
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+
+      if (!user) {
+        throw new Error("No authenticated user for project update");
+      }
+
+      // Convert to DB format with proper user_id
       const dbProject = {
         id: updatedProject.id,
-        user_id: "11111111-1111-1111-1111-111111111111", // Temporary hardcoded ID for testing
+        user_id: user.id,
         name: updatedProject.name,
         goal: updatedProject.goal,
         color: updatedProject.color,
@@ -190,6 +252,14 @@ export const ProjectService = {
 
     // Try to delete from Supabase
     try {
+      // Get authenticated user
+      const { data: authData } = await supabase.auth.getUser();
+      const user = authData?.user;
+
+      if (!user) {
+        throw new Error("No authenticated user for project deletion");
+      }
+
       const { error } = await supabase
         .from("projects")
         .delete()
@@ -257,45 +327,92 @@ export const ProjectService = {
   // Sync local projects with remote database
   async syncProjects(): Promise<Project[]> {
     try {
-      console.log("Starting project sync...");
+      console.log(
+        "Starting bidirectional project sync with timestamp resolution..."
+      );
 
-      // Get local projects
-      const localProjects = await this.getLocalProjects();
-      console.log(`Found ${localProjects.length} local projects`);
-
-      // Get pending operations
+      // Process pending operations first
       const pendingOps = await this.getPendingOperations();
-      console.log(`Found ${pendingOps.length} pending operations`);
-
-      // Process pending operations with better error handling
       if (pendingOps.length > 0) {
         await this.processPendingOperationsWithRetry(pendingOps);
       }
 
-      // Fetch remote projects to verify sync
+      // Fetch remote projects
       const { data: remoteProjects, error } = await supabase
         .from("projects")
         .select("*");
 
-      if (error) {
-        console.error("Error fetching remote projects:", error);
-        throw new Error(`Failed to fetch remote projects: ${error.message}`);
+      if (error) throw error;
+      if (!remoteProjects) return [];
+
+      // Get current local projects
+      const localProjects = await this.getLocalProjects();
+
+      // Build lookup maps for faster access
+      const localProjectMap = new Map(
+        localProjects.map((project) => [project.id, project])
+      );
+
+      const remoteProjectMap = new Map(
+        remoteProjects.map((project) => [
+          project.id,
+          {
+            id: project.id,
+            name: project.name,
+            goal: project.goal,
+            color: project.color,
+            createdAt: new Date(project.created_at),
+            updatedAt: new Date(project.updated_at),
+          },
+        ])
+      );
+
+      // Merge projects with timestamp-based conflict resolution
+      const mergedProjects: Project[] = [];
+
+      // Add all remote projects
+      for (const [id, remoteProject] of remoteProjectMap.entries()) {
+        const localProject = localProjectMap.get(id);
+
+        if (!localProject) {
+          // Project exists only remotely, add it locally
+          mergedProjects.push(remoteProject);
+        } else {
+          // Project exists in both places, use the one with the most recent update
+          const localUpdateTime = localProject.updatedAt.getTime();
+          const remoteUpdateTime = remoteProject.updatedAt.getTime();
+
+          mergedProjects.push(
+            localUpdateTime > remoteUpdateTime ? localProject : remoteProject
+          );
+        }
       }
 
-      console.log(`Fetched ${remoteProjects?.length || 0} remote projects`);
+      // Add local projects that don't exist remotely
+      for (const [id, localProject] of localProjectMap.entries()) {
+        if (!remoteProjectMap.has(id)) {
+          mergedProjects.push(localProject);
 
-      // Compare local and remote counts for verification
-      if (remoteProjects && remoteProjects.length !== localProjects.length) {
-        console.warn(
-          `Sync count mismatch - Local: ${localProjects.length}, Remote: ${remoteProjects.length}`
-        );
+          // Add to pending operations queue to push to remote
+          await this.addPendingOperation({
+            type: "insert",
+            data: localProject,
+            timestamp: Date.now(),
+          });
+          console.log(
+            `Added local-only project to pending operations: ${localProject.name}`
+          );
+        }
       }
 
-      // Return remote projects to update local state
-      return remoteProjects || [];
+      // Save merged result to local storage
+      await this.saveLocalProjects(mergedProjects);
+
+      console.log(`Synced and merged ${mergedProjects.length} projects`);
+      return mergedProjects;
     } catch (error) {
       console.error("Project sync failed:", error);
-      throw error;
+      return [];
     }
   },
 
@@ -409,7 +526,7 @@ export const ProjectService = {
 
         // Remove from pending ops if successful
         await this.removePendingOperation(op.data.id);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Error processing ${op.type} operation:`, error);
         failures.push({
           op,
@@ -463,10 +580,44 @@ export const ProjectService = {
   generateUUID(): string {
     return uuidv4();
   },
+
+  /**
+   * Clean up invalid pending operations that can't be processed
+   */
+  async cleanupPendingOperations() {
+    try {
+      console.log("Cleaning up invalid pending operations...");
+      const pendingOps = await this.getPendingOperations();
+      console.log(`Found ${pendingOps.length} pending operations`);
+
+      const validOps = pendingOps.filter((op) => {
+        // For insert/update operations, ensure required fields exist
+        if ((op.type === "insert" || op.type === "update") && op.data) {
+          if (!op.data.name) {
+            console.log(
+              `Removing invalid operation - missing required name field`,
+              op
+            );
+            return false;
+          }
+        }
+        return true;
+      });
+
+      console.log(
+        `Removed ${pendingOps.length - validOps.length} invalid operations`
+      );
+      await this.savePendingOperations(validOps);
+      return validOps;
+    } catch (error) {
+      console.error("Error cleaning up pending operations:", error);
+      return [];
+    }
+  },
 };
 
 // Helper to check if a string is a valid UUID
-function isValidUUID(id) {
+function isValidUUID(id: string | undefined | null): boolean {
   if (!id) return false;
   const uuidRegex =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -8,11 +8,11 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
-import { usePomodoro } from "@/contexts/AlarmContext";
 import OnboardingScreen from "./OnboardingScreen";
 import { OnboardingScreen as OnboardingScreenType } from "@/contexts/OnboardingContext";
 import ProjectList from "./ProjectList";
 import { Project } from "@/types/project";
+import { useProjects } from "@/contexts/ProjectContext";
 
 interface ProjectSetupScreenProps {
   screen: OnboardingScreenType;
@@ -29,7 +29,7 @@ export default function ProjectSetupScreen({
   onNext,
   onBack,
 }: ProjectSetupScreenProps) {
-  const { projects, addProject, updateProject, deleteProject } = usePomodoro();
+  const { projects, addProject, updateProject, deleteProject } = useProjects();
   const [hasProjects, setHasProjects] = useState(projects.length > 0);
 
   useEffect(() => {

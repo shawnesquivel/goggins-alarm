@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Modal, View, TextInput, TouchableOpacity } from "react-native";
 import { Text } from "@/components/Themed";
 import { usePomodoro } from "@/contexts/AlarmContext";
+import { useProjects } from "@/contexts/ProjectContext";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 
 interface StartSessionModalProps {
@@ -15,10 +16,13 @@ export default function StartSessionModal({
   onClose,
   onSessionStart,
 }: StartSessionModalProps) {
-  const { projects, startFocusSession } = usePomodoro();
+  // Get projects from ProjectContext, startFocusSession from AlarmContext
+  const { startFocusSession } = usePomodoro();
+  const { projects, loading } = useProjects();
+
   const [taskDescription, setTaskDescription] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
-  const [sessionDuration, setSessionDuration] = useState(25); // Default duration
+  const [sessionDuration, setSessionDuration] = useState(25); // TODO: Change default duration to public.users.default_deep_work_minutes
   const [isListening, setIsListening] = useState(false);
 
   // Initialize with first project if available
@@ -105,30 +109,40 @@ export default function StartSessionModal({
                   <Text className="text-sm font-medium mb-2 text-gray-700">
                     Project
                   </Text>
-                  <View className="flex-row flex-wrap gap-2">
-                    {projects.map((project) => (
-                      <TouchableOpacity
-                        key={project.id}
-                        onPress={() => setSelectedProjectId(project.id)}
-                        className={`px-4 py-2 rounded-full border-2 ${
-                          selectedProjectId === project.id
-                            ? "border-black"
-                            : "border-transparent"
-                        }`}
-                        style={{ backgroundColor: project.color }}
-                      >
-                        <Text
-                          className={`${
+                  {loading ? (
+                    <Text className="text-sm text-gray-600 italic">
+                      Loading projects...
+                    </Text>
+                  ) : projects.length === 0 ? (
+                    <Text className="text-sm text-gray-600 italic">
+                      No projects available. Please create a project first.
+                    </Text>
+                  ) : (
+                    <View className="flex-row flex-wrap gap-2">
+                      {projects.map((project) => (
+                        <TouchableOpacity
+                          key={project.id}
+                          onPress={() => setSelectedProjectId(project.id)}
+                          className={`px-4 py-2 rounded-full border-2 ${
                             selectedProjectId === project.id
-                              ? "text-black font-medium"
-                              : "text-white"
+                              ? "border-black"
+                              : "border-transparent"
                           }`}
+                          style={{ backgroundColor: project.color }}
                         >
-                          {project.name}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                          <Text
+                            className={`${
+                              selectedProjectId === project.id
+                                ? "text-black font-medium"
+                                : "text-white"
+                            }`}
+                          >
+                            {project.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
 
                 {/* Duration Selection */}
@@ -176,8 +190,20 @@ export default function StartSessionModal({
             </TouchableOpacity>
             <TouchableOpacity
               onPress={handleStartSession}
-              className="flex-1 p-4 bg-black"
-              disabled={!taskDescription.trim() || !selectedProjectId}
+              className={`flex-1 p-4 ${
+                !taskDescription.trim() ||
+                !selectedProjectId ||
+                loading ||
+                projects.length === 0
+                  ? "bg-gray-400"
+                  : "bg-black"
+              }`}
+              disabled={
+                !taskDescription.trim() ||
+                !selectedProjectId ||
+                loading ||
+                projects.length === 0
+              }
             >
               <Text className="text-center text-white font-medium">
                 Start Session
