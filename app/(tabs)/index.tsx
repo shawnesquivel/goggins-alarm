@@ -32,6 +32,7 @@ export default function TimerScreen() {
     completeSession,
     startBreakSession,
     settings,
+    isOvertime,
   } = usePomodoro();
   const { session } = useAuth();
   const { projects } = useProjects();
@@ -44,16 +45,22 @@ export default function TimerScreen() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showBreakRatingModal, setShowBreakRatingModal] = useState(false);
   const [sessionNotes, setSessionNotes] = useState("");
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
 
   // Format remaining time as mm:ss
   const formatTimeDisplay = (seconds: number): string => {
+    console.log(
+      `Formatting time - seconds: ${seconds}, isOvertime: ${isOvertime}`
+    );
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
+    const timeString = `${mins.toString().padStart(2, "0")}:${secs
       .toString()
       .padStart(2, "0")}`;
+    console.log(`Formatted time: ${isOvertime ? "+" : ""}${timeString}`);
+    return `${isOvertime ? "+" : ""}${timeString}`;
   };
 
   // Handle session completion and rating
@@ -63,8 +70,25 @@ export default function TimerScreen() {
     setSessionNotes("");
   };
 
+  // Add a handler for break session completion
+  const handleCompleteBreakSession = (rating?: "happy" | "sad") => {
+    completeSession(rating, sessionNotes);
+    setShowBreakRatingModal(false);
+    setSessionNotes("");
+  };
+
   // Handle timer controls
   const handleTimerControls = () => {
+    // If in overtime mode and running, complete the session instead of pausing
+    if (isOvertime && timerStatus === TimerStatus.RUNNING) {
+      if (currentSession?.type === "break") {
+        setShowBreakRatingModal(true);
+      } else {
+        setShowRatingModal(true);
+      }
+      return;
+    }
+
     switch (timerStatus) {
       case TimerStatus.RUNNING:
         pauseSession();
@@ -73,7 +97,11 @@ export default function TimerScreen() {
         resumeSession();
         break;
       case TimerStatus.COMPLETED:
-        setShowRatingModal(true);
+        if (currentSession?.type === "break") {
+          setShowBreakRatingModal(true);
+        } else {
+          setShowRatingModal(true);
+        }
         break;
       default:
         setShowStartModal(true);
@@ -94,6 +122,11 @@ export default function TimerScreen() {
 
   // Get appropriate button text based on timer status
   const getButtonText = (): string => {
+    // If in overtime mode, always show "Complete" instead of "Pause"
+    if (isOvertime && timerStatus === TimerStatus.RUNNING) {
+      return "Complete";
+    }
+
     switch (timerStatus) {
       case TimerStatus.RUNNING:
         return "Pause";
@@ -121,7 +154,6 @@ export default function TimerScreen() {
   // Full screen timer component
   const FullScreenTimer = () => {
     if (!fontsLoaded) return null;
-
     return (
       <View className="absolute w-full h-full bg-black z-50 justify-center items-center">
         <View className="w-full items-center justify-center p-5">
@@ -237,11 +269,20 @@ export default function TimerScreen() {
               {currentSession.taskDescription}
             </Text>
             <Text
-              className="text-[72px] font-bold mb-5"
+              className={`text-[72px] font-bold mb-2 ${
+                isOvertime ? "text-red-500" : ""
+              }`}
               style={{ fontFamily: "LibreCaslonText_400Regular" }}
             >
               {formatTimeDisplay(remainingSeconds)}
             </Text>
+
+            {isOvertime && (
+              <Text className="text-base text-red-500 mb-3">
+                You hit your goal of {currentSession.duration} min
+              </Text>
+            )}
+
             <Text className="text-base text-gray-500 mb-8">
               {getProjectName(currentSession.projectId)}
             </Text>
@@ -337,6 +378,59 @@ export default function TimerScreen() {
             <TouchableOpacity
               className="py-2.5 items-center"
               onPress={() => handleCompleteSession()}
+            >
+              <Text className="text-gray-500 text-base">Skip Rating</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Break Rating Modal */}
+      <Modal
+        visible={showBreakRatingModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowBreakRatingModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center">
+          <View className="bg-white rounded-xl p-6 w-[90%] max-w-[400px]">
+            <Text className="text-xl font-bold mb-4 text-center">
+              How was your rest session?
+            </Text>
+
+            <View className="flex-row justify-around mb-6">
+              <TouchableOpacity
+                className="items-center p-2.5"
+                onPress={() => handleCompleteBreakSession("happy")}
+              >
+                <FontAwesome name="smile-o" size={32} color="#4CAF50" />
+                <Text className="text-base text-gray-600">Refreshed</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                className="items-center p-2.5"
+                onPress={() => handleCompleteBreakSession("sad")}
+              >
+                <FontAwesome name="frown-o" size={32} color="#F44336" />
+                <Text className="text-base text-gray-600">Still Tired</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text className="text-base text-gray-800 mb-2">
+              What did you do on your break? (optional)
+            </Text>
+            <TextInput
+              className="border border-gray-300 rounded-lg p-3 text-base h-[100px] mb-4"
+              multiline={true}
+              value={sessionNotes}
+              onChangeText={setSessionNotes}
+              placeholder="Something active? Refuelled? Something mindful? Doom scrolled?"
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              className="py-2.5 items-center"
+              onPress={() => handleCompleteBreakSession()}
             >
               <Text className="text-gray-500 text-base">Skip Rating</Text>
             </TouchableOpacity>
