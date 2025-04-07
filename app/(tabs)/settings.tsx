@@ -11,7 +11,6 @@ import {
 import { usePomodoro } from "@/contexts/AlarmContext";
 import { useOnboarding } from "@/contexts/OnboardingContext";
 import { useRouter } from "expo-router";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function SettingsScreen() {
@@ -174,7 +173,13 @@ export default function SettingsScreen() {
 }
 
 // Setting Button Component
-function SettingButton({ title, onPress }) {
+function SettingButton({
+  title,
+  onPress,
+}: {
+  title: string;
+  onPress: () => void;
+}) {
   return (
     <TouchableOpacity
       className="bg-white py-4 px-5 rounded-md"
