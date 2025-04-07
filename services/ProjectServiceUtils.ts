@@ -86,14 +86,22 @@ export const testSyncProjects = async () => {
 export const testProcessPendingOperations = async () => {
   console.log("Testing process pending operations...");
   try {
-    await ProjectService.processPendingOperationsWithRetry();
-    console.log("Processed pending operations");
-
-    // Get the current pending operations
+    // Get pending operations first
     const pendingOps = await ProjectService.getPendingOperations();
-    console.log("Remaining pending operations:", pendingOps);
 
-    return pendingOps;
+    if (pendingOps.length > 0) {
+      // Pass the operations to the function
+      await ProjectService.processPendingOperationsWithRetry(pendingOps);
+      console.log("Processed pending operations");
+    } else {
+      console.log("No pending operations to process");
+    }
+
+    // Get the current pending operations after processing
+    const remainingOps = await ProjectService.getPendingOperations();
+    console.log("Remaining pending operations:", remainingOps);
+
+    return remainingOps;
   } catch (error) {
     console.error("Error processing pending operations:", error);
   }
