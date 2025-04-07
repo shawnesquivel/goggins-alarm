@@ -40,14 +40,6 @@ interface PomodoroContextType {
   completeSession: (rating?: "happy" | "sad", notes?: string) => void;
   startBreakSession: () => void;
 
-  // Project management
-  projects: Project[];
-  addProject: (
-    project: Omit<Project, "id" | "createdAt" | "updatedAt">
-  ) => void;
-  updateProject: (project: Project) => void;
-  deleteProject: (id: string) => void;
-
   // Tags
   tags: Tag[];
   addTag: (tag: Omit<Tag, "id">) => void;

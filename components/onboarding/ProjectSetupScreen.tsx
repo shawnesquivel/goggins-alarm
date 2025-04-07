@@ -85,12 +85,7 @@ export default function ProjectSetupScreen({
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.projectListContainer}>
-            <ProjectList
-              projects={projects}
-              onAddProject={handleAddProject}
-              onUpdateProject={handleUpdateProject}
-              onDeleteProject={handleDeleteProject}
-            />
+            <ProjectList />
           </View>
         </ScrollView>
       </KeyboardAvoidingView>

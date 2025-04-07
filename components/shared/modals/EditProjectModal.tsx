@@ -90,9 +90,16 @@ export default function EditProjectModal({
   }, [visible]);
 
   useEffect(() => {
-    setName(project.name);
-    setGoal(project.goal);
-    setSelectedColor(project.color || colors[0]);
+    if (project) {
+      setName(project.name || "");
+      setGoal(project.goal || "");
+      setSelectedColor(project.color || colors[0]);
+    } else {
+      // Set default values when no project is provided
+      setName("");
+      setGoal("");
+      setSelectedColor(colors[0]);
+    }
   }, [project]);
 
   const handleSave = () => {

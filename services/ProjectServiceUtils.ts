@@ -86,7 +86,7 @@ export const testSyncProjects = async () => {
 export const testProcessPendingOperations = async () => {
   console.log("Testing process pending operations...");
   try {
-    await ProjectService.processPendingOperations();
+    await ProjectService.processPendingOperationsWithRetry();
     console.log("Processed pending operations");
 
     // Get the current pending operations
