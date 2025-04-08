@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Project } from "@/types/project";
 import { ProjectService } from "@/services/ProjectService";
+import { supabase } from "@/lib/supabase";
 
 interface ProjectContextType {
   projects: Project[];

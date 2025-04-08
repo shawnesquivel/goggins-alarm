@@ -25,14 +25,17 @@ export const ProjectService = {
 
   async setOfflineMode(enabled: boolean) {
     this.isOfflineMode = enabled;
-    await AsyncStorage.setItem(STORAGE_KEYS.OFFLINE_MODE, JSON.stringify(enabled));
-    console.log(`Offline mode ${enabled ? 'enabled' : 'disabled'}`);
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.OFFLINE_MODE,
+      JSON.stringify(enabled)
+    );
+    console.log(`Offline mode ${enabled ? "enabled" : "disabled"}`);
   },
 
   async checkOfflineMode() {
     try {
       const offlineMode = await AsyncStorage.getItem(STORAGE_KEYS.OFFLINE_MODE);
-      this.isOfflineMode = offlineMode === 'true';
+      this.isOfflineMode = offlineMode === "true";
       return this.isOfflineMode;
     } catch (error) {
       console.error("Error checking offline mode:", error);
@@ -361,7 +364,6 @@ export const ProjectService = {
         return await this.getLocalProjects();
       }
 
-
       // Process pending operations first
       const pendingOps = await this.getPendingOperations();
       if (pendingOps.length > 0) {
@@ -462,11 +464,6 @@ export const ProjectService = {
         if (op.data) {
           op.data = this.normalizeProjectDates(op.data);
         }
-
-        console.log(
-          `Processing ${op.type} operation for project:`,
-          op.type === "delete" ? op.data?.id : op.data?.name || "unknown"
-        );
 
         let result;
 

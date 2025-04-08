@@ -17,8 +17,6 @@ import {
 export const SessionService: SessionServiceInterface = {
   // Session operations
   async createSession(sessionData: DbSessionInsert): Promise<DbSession> {
-    console.log("SessionService: Creating session", sessionData);
-
     // Generate ID if not provided
     const session: DbSession = {
       ...sessionData,
@@ -49,7 +47,6 @@ export const SessionService: SessionServiceInterface = {
       timestamp: Date.now(),
     });
 
-    console.log("SessionService: Session created successfully", session.id);
     return session;
   },
 
@@ -57,8 +54,6 @@ export const SessionService: SessionServiceInterface = {
     sessionId: string,
     sessionData: DbSessionUpdate
   ): Promise<DbSession> {
-    console.log("SessionService: Updating session", sessionId, sessionData);
-
     // Get existing session
     const session = await this.getSession(sessionId);
     if (!session) {
@@ -99,21 +94,12 @@ export const SessionService: SessionServiceInterface = {
       timestamp: Date.now(),
     });
 
-    console.log("SessionService: Session updated successfully", sessionId);
     return updatedSession;
   },
 
   async getSession(sessionId: string): Promise<DbSession | null> {
-    console.log("SessionService: Getting session", sessionId);
-
     const sessions = await this.getSessions();
     const session = sessions.find((s) => s.id === sessionId);
-
-    console.log(
-      "SessionService: Session found?",
-      sessionId,
-      session ? "Yes" : "No"
-    );
     return session || null;
   },
 
@@ -177,7 +163,6 @@ export const SessionService: SessionServiceInterface = {
       timestamp: Date.now(),
     });
 
-    console.log("SessionService: Period created successfully", period.id);
     return period;
   },
 
@@ -236,36 +221,20 @@ export const SessionService: SessionServiceInterface = {
     ) {
       await this.calculateSessionTotals(updatedPeriod.session_id);
     }
-
-    console.log("SessionService: Period updated successfully", periodId);
     return updatedPeriod;
   },
 
   async getPeriod(periodId: string): Promise<DbPeriod | null> {
-    console.log("SessionService: Getting period", periodId);
-
     const periods = await this.getLocalPeriods();
     const period = periods.find((p) => p.id === periodId);
 
-    console.log(
-      "SessionService: Period found?",
-      periodId,
-      period ? "Yes" : "No"
-    );
     return period || null;
   },
 
   async getSessionPeriods(sessionId: string): Promise<DbPeriod[]> {
-    console.log("SessionService: Getting periods for session", sessionId);
-
     const periods = await this.getLocalPeriods();
     const sessionPeriods = periods.filter((p) => p.session_id === sessionId);
 
-    console.log(
-      "SessionService: Found periods for session",
-      sessionId,
-      sessionPeriods.length
-    );
     return sessionPeriods;
   },
 
@@ -286,12 +255,6 @@ export const SessionService: SessionServiceInterface = {
     sessionId: string,
     periodType: string
   ): Promise<void> {
-    console.log(
-      "SessionService: Cleaning up in-progress periods",
-      sessionId,
-      periodType
-    );
-
     const periods = await this.getLocalPeriods();
     let updated = false;
 
@@ -329,10 +292,6 @@ export const SessionService: SessionServiceInterface = {
       await AsyncStorage.setItem(
         SESSION_STORAGE_KEYS.PERIODS,
         JSON.stringify(periods)
-      );
-      console.log(
-        "SessionService: Cleaned up in-progress periods for session",
-        sessionId
       );
     }
   },
@@ -404,8 +363,6 @@ export const SessionService: SessionServiceInterface = {
         console.log("SessionService: No authenticated user, aborting sync");
         return false;
       }
-
-      console.log(`SessionService: Processing ${pendingOps.length} operations`);
 
       // Process each operation
       for (const op of pendingOps) {
@@ -531,10 +488,6 @@ export const SessionService: SessionServiceInterface = {
         SESSION_STORAGE_KEYS.PENDING_OPS,
         JSON.stringify(pendingOps)
       );
-
-      console.log(
-        `SessionService: Added pending operation ${operation.type}, total: ${pendingOps.length}`
-      );
     } catch (error) {
       console.error("Error adding pending operation:", error);
     }
@@ -548,10 +501,6 @@ export const SessionService: SessionServiceInterface = {
         SESSION_STORAGE_KEYS.PENDING_OPS,
         JSON.stringify(updatedOps)
       );
-
-      console.log(
-        `SessionService: Removed pending operation ${operationId}, remaining: ${updatedOps.length}`
-      );
     } catch (error) {
       console.error("Error removing pending operation:", error);
     }
@@ -562,17 +511,11 @@ export const SessionService: SessionServiceInterface = {
     total_deep_work_minutes: number;
     total_deep_rest_minutes: number;
   }> {
-    console.log("SessionService: Calculating session totals for", sessionId);
-
     const sessionPeriods = await this.getSessionPeriods(sessionId);
     const completedPeriods = sessionPeriods.filter((p) => p.completed);
 
     let totalWorkSeconds = 0;
     let totalRestSeconds = 0;
-
-    console.log(
-      `SessionService: Found ${completedPeriods.length} completed periods for session ${sessionId}`
-    );
 
     for (const period of completedPeriods) {
       if (!period.actual_duration_minutes) continue;
