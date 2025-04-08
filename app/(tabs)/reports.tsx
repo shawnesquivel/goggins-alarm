@@ -1,10 +1,23 @@
-import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
+import { View, Text, ScrollView, Pressable } from "react-native";
 import React, { useState, useEffect } from "react";
 import { usePomodoro } from "@/contexts/AlarmContext";
 import { useProjects } from "@/contexts/ProjectContext";
 import { PomodoroSession } from "@/types/alarm";
+import { ProjectPieChart } from "../../components/charts/ProjectPieChart";
+import { format, startOfWeek, addWeeks, subWeeks } from "date-fns";
+import { WeekPicker } from "../../components/WeekPicker";
+import {
+  LibreBaskerville_400Regular,
+  LibreBaskerville_400Regular_Italic,
+  useFonts,
+} from "@expo-google-fonts/libre-baskerville";
 
 export default function ReportsScreen() {
+  const [fontsLoaded] = useFonts({
+    LibreBaskerville_400Regular,
+    LibreBaskerville_400Regular_Italic,
+  });
+
   const { getSessionHistory, getTotalFocusTime, getProjectStats } =
     usePomodoro();
   const { projects } = useProjects();
@@ -19,6 +32,14 @@ export default function ReportsScreen() {
     Record<string, { totalSessions: number; totalMinutes: number }>
   >({});
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedWeek, setSelectedWeek] = useState(new Date());
+  const [weeklyStats, setWeeklyStats] = useState({
+    deepWorkSessions: 3,
+    deepWorkTime: "56:00",
+    deepRestSessions: 1,
+    deepRestTime: "10:00",
+  });
+  const [weekPickerVisible, setWeekPickerVisible] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -115,284 +136,60 @@ export default function ReportsScreen() {
       );
   };
 
+  // Function to handle week selection
+  const handleWeekChange = (direction: "next" | "prev") => {
+    setSelectedWeek((current) =>
+      direction === "next" ? addWeeks(current, 1) : subWeeks(current, 1)
+    );
+  };
+
+  // Format the week display
+  const getWeekDisplay = () => {
+    const start = startOfWeek(selectedWeek);
+    return `Week of ${format(start, "MMM d")}`;
+  };
+
+  if (!fontsLoaded) {
+    return (
+      <View className="flex-1 bg-[#FAF9F6]">
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <ScrollView>
-        {/* Period Selector */}
-        <View style={styles.periodSelector}>
-          <Pressable
-            style={[
-              styles.periodButton,
-              selectedPeriod === "day" && styles.selectedPeriod,
-            ]}
-            onPress={() => setSelectedPeriod("day")}
+    <ScrollView className="flex-1 bg-[#FAF9F6]">
+      <View className="p-4 bg-[#FAF9F6]">
+        <Text className="text-base font-medium text-[#000] tracking-wider mb-4">
+          WEEK AT A GLANCE
+        </Text>
+        <Pressable
+          className="flex-row items-center"
+          onPress={() => setWeekPickerVisible(true)}
+        >
+          <Text
+            className="text-4xl text-black"
+            style={{ fontFamily: "LibreBaskerville_400Regular_Italic" }}
           >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "day" && styles.selectedPeriodText,
-              ]}
-            >
-              Day
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.periodButton,
-              selectedPeriod === "week" && styles.selectedPeriod,
-            ]}
-            onPress={() => setSelectedPeriod("week")}
-          >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "week" && styles.selectedPeriodText,
-              ]}
-            >
-              Week
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.periodButton,
-              selectedPeriod === "month" && styles.selectedPeriod,
-            ]}
-            onPress={() => setSelectedPeriod("month")}
-          >
-            <Text
-              style={[
-                styles.periodButtonText,
-                selectedPeriod === "month" && styles.selectedPeriodText,
-              ]}
-            >
-              Month
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Summary Card */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>
-            Total Focus Time -{" "}
-            {selectedPeriod.charAt(0).toUpperCase() + selectedPeriod.slice(1)}
+            {getWeekDisplay()}
           </Text>
-          <Text style={styles.summaryValue}>
-            {formatTime(getPeriodTotal())}
-          </Text>
-        </View>
+          <Text className="text-base ml-2 text-[#333]">▼</Text>
+        </Pressable>
+      </View>
 
-        {/* Projects Summary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Project Breakdown</Text>
-          {projects.length === 0 ? (
-            <Text style={styles.emptyText}>No projects created yet</Text>
-          ) : (
-            projects.map((project) => {
-              const stats = projectStats[project.id] || {
-                totalSessions: 0,
-                totalMinutes: 0,
-              };
-              return (
-                <View
-                  key={project.id}
-                  style={[
-                    styles.projectRow,
-                    { borderLeftColor: project.color || "#4A90E2" },
-                  ]}
-                >
-                  <Text style={styles.projectName}>{project.name}</Text>
-                  <View style={styles.projectStats}>
-                    <Text style={styles.sessionCount}>
-                      {stats.totalSessions} sessions
-                    </Text>
-                    <Text style={styles.timeTotal}>
-                      {formatTime(stats.totalMinutes)}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </View>
+      <View className="p-4">
+        <ProjectPieChart />
+      </View>
 
-        {/* Recent Sessions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Sessions</Text>
-          {getFilteredSessions().length === 0 ? (
-            <Text style={styles.emptyText}>No sessions in this period</Text>
-          ) : (
-            getFilteredSessions()
-              .slice(0, 10)
-              .map((session) => (
-                <View key={session.id} style={styles.sessionItem}>
-                  <View style={styles.sessionHeader}>
-                    <Text style={styles.sessionProject}>
-                      {getProjectName(session.projectId)}
-                    </Text>
-                    <Text style={styles.sessionDate}>
-                      {new Date(session.startTime).toLocaleString()}
-                    </Text>
-                  </View>
-                  <Text style={styles.sessionDescription}>
-                    {session.taskDescription}
-                  </Text>
-                  <View style={styles.sessionFooter}>
-                    <Text style={styles.sessionDuration}>
-                      {formatTime(
-                        session.endTime
-                          ? (new Date(session.endTime).getTime() -
-                              new Date(session.startTime).getTime()) /
-                              (1000 * 60)
-                          : session.duration
-                      )}
-                    </Text>
-                    {session.rating && (
-                      <Text style={styles.sessionRating}>
-                        {session.rating >= 3 ? "😊" : "😞"}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              ))
-          )}
-        </View>
-      </ScrollView>
-    </View>
+      <WeekPicker
+        visible={weekPickerVisible}
+        onClose={() => setWeekPickerVisible(false)}
+        selectedDate={selectedWeek}
+        onSelectWeek={(date: Date) => {
+          setSelectedWeek(date);
+          loadData();
+        }}
+      />
+    </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: "#f8f8f8",
-  },
-  periodSelector: {
-    flexDirection: "row",
-    marginBottom: 16,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    overflow: "hidden",
-  },
-  periodButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-  selectedPeriod: {
-    backgroundColor: "#4A90E2",
-  },
-  periodButtonText: {
-    fontSize: 16,
-    fontWeight: "500",
-    color: "#666",
-  },
-  selectedPeriodText: {
-    color: "#fff",
-  },
-  summaryCard: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  summaryTitle: {
-    fontSize: 16,
-    color: "#666",
-    marginBottom: 8,
-  },
-  summaryValue: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  section: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 16,
-    color: "#333",
-  },
-  emptyText: {
-    fontSize: 14,
-    color: "#999",
-    textAlign: "center",
-    marginVertical: 16,
-  },
-  projectRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-    borderLeftWidth: 4,
-    paddingLeft: 12,
-  },
-  projectName: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  projectStats: {
-    alignItems: "flex-end",
-  },
-  sessionCount: {
-    fontSize: 14,
-    color: "#666",
-  },
-  timeTotal: {
-    fontSize: 14,
-    fontWeight: "500",
-    color: "#333",
-  },
-  sessionItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f0f0f0",
-  },
-  sessionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 4,
-  },
-  sessionProject: {
-    fontSize: 16,
-    fontWeight: "500",
-  },
-  sessionDate: {
-    fontSize: 12,
-    color: "#999",
-  },
-  sessionDescription: {
-    fontSize: 14,
-    color: "#666",
-    marginBottom: 4,
-  },
-  sessionFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  sessionDuration: {
-    fontSize: 14,
-    fontWeight: "500",
-  },
-  sessionRating: {
-    fontSize: 16,
-  },
-});

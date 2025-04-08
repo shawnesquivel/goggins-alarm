@@ -21,6 +21,23 @@ interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    const initializeOfflineMode = async () => {
+      try {
+        // Try to connect to Supabase
+        const { data, error } = await supabase.from("projects").select("count");
+        if (error) {
+          console.log("Supabase connection failed, enabling offline mode");
+          await ProjectService.setOfflineMode(true);
+        }
+      } catch (error) {
+        console.log("Network error, enabling offline mode");
+        await ProjectService.setOfflineMode(true);
+      }
+    };
+
+    initializeOfflineMode();
+  }, []);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

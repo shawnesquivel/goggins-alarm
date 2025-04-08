@@ -1,16 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
-  Dimensions,
   Modal,
-  TextInput,
+  Alert,
 } from "react-native";
 import { usePomodoro } from "@/contexts/AlarmContext";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { useRouter } from "expo-router";
+import { useRouter, useNavigation } from "expo-router";
 import { TimerStatus } from "@/types/alarm";
 import StartSessionModal from "@/components/shared/modals/StartSessionModal";
 import {
@@ -21,9 +20,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useProjects } from "@/contexts/ProjectContext";
 import SessionDebugPanel from "@/components/debug/SessionDebugPanel";
+import { format } from "date-fns";
+import { ExportModal } from "@/components/shared/modals/ExportModal";
+import { HeaderRight } from "@/components/shared/HeaderRight";
 
 export default function TimerScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const {
     timerStatus,
     remainingSeconds,
@@ -57,6 +60,25 @@ export default function TimerScreen() {
   const [selectedBreakActivities, setSelectedBreakActivities] = useState<
     string[]
   >([]);
+  const [showExportModal, setShowExportModal] = useState(false);
+
+  // Add export ref
+  const exportRef = useRef({
+    showExportModal: () => setShowExportModal(true),
+    getSessionData: () => ({
+      userName: session?.user?.email?.split("@")[0] || "User",
+      duration: currentSession?.duration || 0,
+    }),
+  });
+
+  // Update navigation options when the ref changes
+  useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <HeaderRight onExport={() => exportRef.current.showExportModal()} />
+      ),
+    });
+  }, [navigation]);
 
   // Format remaining time as mm:ss
   const formatTimeDisplay = (seconds: number): string => {
@@ -259,6 +281,14 @@ export default function TimerScreen() {
           >
             <Text className="text-black text-base">END WORK SESSION</Text>
           </TouchableOpacity>
+
+          {/* Add Export Button */}
+          <TouchableOpacity
+            className="py-3 px-6 rounded-md items-center w-full border border-gray-200"
+            onPress={() => setShowExportModal(true)}
+          >
+            <Text className="text-black text-base">SHARE DEEP WORK</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -309,6 +339,11 @@ export default function TimerScreen() {
   const renderSessionDebug = () => {
     if (!__DEV__) return null;
     return <SessionDebugPanel />;
+  // Add this helper function near your other utility functions
+  const formatDurationForExport = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
   };
 
   return isFullScreen ? (
@@ -405,10 +440,18 @@ export default function TimerScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              className="py-3 px-6 rounded-md items-center w-full"
+              className="py-3 px-6 rounded-md items-center w-full mb-3"
               onPress={handleCancelSession}
             >
               <Text className="text-black text-base">END WORK SESSION</Text>
+            </TouchableOpacity>
+
+            {/* Add Export Button */}
+            <TouchableOpacity
+              className="py-3 px-6 rounded-md items-center w-full border border-gray-200"
+              onPress={() => setShowExportModal(true)}
+            >
+              <Text className="text-black text-base">SHARE DEEP WORK</Text>
             </TouchableOpacity>
           </>
         ) : (
@@ -622,6 +665,17 @@ export default function TimerScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Export Modal */}
+      <ExportModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        userName={session?.user?.email?.split("@")[0] || "User"}
+        deepWorkTime={formatDurationForExport(
+          Math.floor(currentSession?.duration || 0) * 60
+        )}
+        date={format(new Date(), "EEE, MMM d")}
+      />
     </ScrollView>
   );
 }
