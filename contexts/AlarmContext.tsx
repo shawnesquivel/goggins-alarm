@@ -13,6 +13,8 @@ import {
   TimerStatus,
 } from "@/types/alarm";
 import { Audio } from "expo-av";
+import { SessionService } from "@/services/SessionService";
+import { v4 as uuidv4 } from "uuid";
 
 // Keys for AsyncStorage
 const STORAGE_KEYS = {
@@ -40,8 +42,14 @@ interface PomodoroContextType {
   ) => void;
   pauseSession: () => void;
   resumeSession: () => void;
-  completeSession: (rating?: "happy" | "sad", notes?: string) => void;
+  completeSession: (
+    rating?: number,
+    notes?: string,
+    transitionToBreak?: boolean,
+    breakActivities?: string[]
+  ) => void;
   startBreakSession: () => void;
+  cancelSession: () => void;
 
   // Tags
   tags: Tag[];
@@ -64,8 +72,6 @@ interface PomodoroContextType {
 const DEFAULT_SETTINGS: TimerSettings = {
   focusDuration: 25,
   breakDuration: 5,
-  autoStartBreak: true,
-  autoStartNextFocus: false,
   soundEnabled: true,
   notificationsEnabled: true,
 };
@@ -181,19 +187,9 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Add this after your other useEffects
   useEffect(() => {
-    console.log(`⚠️ isOvertime STATE CHANGED to: ${isOvertime}`);
-
-    // When overtime state changes, let's make sure the timer updates properly
     if (isOvertime && timerStatus === TimerStatus.RUNNING) {
-      console.log(
-        "Overtime state changed while timer running, checking timer state"
-      );
       if (remainingSeconds <= 0) {
-        console.log(
-          "Remaining seconds is <= 0, setting to 1 for overtime start"
-        );
         setRemainingSeconds(1);
       }
     }
@@ -208,16 +204,11 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     timerRef.current = setInterval(() => {
       setRemainingSeconds((prev) => {
-        console.log(
-          `Timer tick - Previous seconds: ${prev}, isOvertime ref: ${isOvertimeRef.current}, state: ${isOvertime}`
-        );
-
         if (prev <= 0 && !isOvertimeRef.current) {
           playTimerCompleteSound();
-
           isOvertimeRef.current = true;
           setIsOvertime(true);
-
+          console.log("Timer completed, entering overtime mode");
           return 1;
         } else if (isOvertimeRef.current) {
           return prev + 1;
@@ -258,6 +249,18 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     customDuration?: number,
     customBreakDuration?: number
   ) => {
+    console.log("AlarmContext: Starting focus session", {
+      taskDescription,
+      projectId,
+      customDuration,
+      customBreakDuration,
+    });
+
+    // Reset all session state
+    isOvertimeRef.current = false;
+    setIsOvertime(false);
+    setNextBreakDuration(null);
+
     // Create new session with either custom duration or default from settings
     const duration =
       customDuration !== undefined ? customDuration : settings.focusDuration;
@@ -265,12 +268,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     // Store custom break duration for next break if provided
     if (customBreakDuration !== undefined) {
       setNextBreakDuration(customBreakDuration);
-    } else {
-      setNextBreakDuration(null);
     }
 
     const newSession: PomodoroSession = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       taskDescription,
       projectId,
       startTime: new Date(),
@@ -280,12 +281,40 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       type: "focus",
     };
 
+    try {
+      // Create session in database
+      await SessionService.createSession({
+        id: newSession.id,
+        task: taskDescription,
+        project_id: projectId,
+        status: "in_progress",
+      });
+
+      console.log("AlarmContext: Created session in DB", newSession.id);
+
+      // Create work period
+      await SessionService.createPeriod({
+        session_id: newSession.id,
+        type: "work",
+        planned_duration_minutes: duration,
+        started_at: new Date().toISOString(),
+      });
+
+      console.log("AlarmContext: Created work period in DB");
+    } catch (error) {
+      console.error(
+        "AlarmContext: Error creating session/period in DB:",
+        error
+      );
+      // Continue anyway - we want UI to work even if DB fails
+    }
+
     setCurrentSession(newSession);
     // Convert minutes to seconds (handle fractional minutes for short sessions)
     setRemainingSeconds(Math.round(duration * 60));
     setTimerStatus(TimerStatus.RUNNING);
 
-    // Save current session
+    // Save current session to local AsyncStorage (UI state)
     await AsyncStorage.setItem(
       STORAGE_KEYS.CURRENT_SESSION,
       JSON.stringify(newSession)
@@ -296,52 +325,131 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   };
 
   const pauseSession = () => {
+    console.log("AlarmContext: Pausing session");
     stopTimer();
     setTimerStatus(TimerStatus.PAUSED);
+
+    // Note: For MVP, we're not recording pauses in the database
+    // Future enhancement could be to track pause times
   };
 
   const resumeSession = () => {
+    console.log("AlarmContext: Resuming session");
     setTimerStatus(TimerStatus.RUNNING);
     startTimer();
+
+    // Note: For MVP, we're not recording resumes in the database
+    // Future enhancement could be to track pause durations
   };
 
-  const completeSession = async (rating?: "happy" | "sad", notes?: string) => {
+  const completeSession = async (
+    rating?: number,
+    notes?: string,
+    transitionToBreak: boolean = false,
+    breakActivities?: string[]
+  ) => {
+    console.log("AlarmContext: Completing session", {
+      sessionId: currentSession?.id,
+      rating,
+      notesLength: notes?.length || 0,
+      transitionToBreak,
+      breakActivities,
+    });
+
     if (!currentSession) return;
 
     stopTimer();
 
-    // Reset overtime state
-    isOvertimeRef.current = false;
-    setIsOvertime(false);
+    // Get the current period from SessionService
+    const currentPeriod = await SessionService.getCurrentPeriod();
 
-    // Update session with completion data
-    const completedSession = {
-      ...currentSession,
-      endTime: new Date(),
-      isCompleted: true,
-      rating,
-      notes,
-    };
+    if (currentPeriod) {
+      console.log("AlarmContext: Found current period", currentPeriod.id);
 
-    // Clear current session
+      // Calculate actual duration including overtime
+      const startTime = new Date(currentSession.startTime);
+      const endTime = new Date();
+      const actualSeconds = Math.floor(
+        (endTime.getTime() - startTime.getTime()) / 1000
+      );
+      const plannedSeconds = currentSession.duration * 60;
+
+      console.log("AlarmContext: Duration calculation", {
+        planned: plannedSeconds,
+        actual: actualSeconds,
+        overtime: actualSeconds - plannedSeconds,
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        isOvertime: isOvertimeRef.current,
+      });
+
+      // Complete the period with different fields based on session type
+      const periodUpdate = {
+        actual_duration_minutes: actualSeconds / 60,
+        ended_at: endTime.toISOString(),
+        completed: true,
+      };
+
+      if (currentSession.type === "focus") {
+        // For focus sessions, include rating and notes
+        Object.assign(periodUpdate, {
+          quality_rating: rating || null,
+          user_notes: notes || null,
+        });
+      } else if (currentSession.type === "break") {
+        // For break sessions, include activities
+        Object.assign(periodUpdate, {
+          rest_activities_selected: breakActivities || null,
+        });
+      }
+
+      await SessionService.updatePeriod(currentPeriod.id, periodUpdate);
+
+      // Update session
+      await SessionService.updateSession(currentSession.id, {
+        status: "completed",
+        completed: true,
+        user_notes: notes || null,
+      });
+
+      console.log("AlarmContext: Updated session status to completed");
+
+      // Force sync to Supabase
+      await SessionService.syncToSupabase();
+    } else {
+      console.warn(
+        "AlarmContext: No current period found when completing session"
+      );
+    }
+
+    // Store the current session data before clearing it
+    const completedSession = currentSession;
+
+    // UI state updates
     setCurrentSession(null);
     setTimerStatus(TimerStatus.IDLE);
     await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
 
-    // Save completed session to history
-    const savedSessions = await AsyncStorage.getItem(STORAGE_KEYS.SESSIONS);
-    const sessions = savedSessions ? JSON.parse(savedSessions) : [];
-    sessions.push(completedSession);
-    await AsyncStorage.setItem(STORAGE_KEYS.SESSIONS, JSON.stringify(sessions));
+    // Clear current period in SessionService
+    await SessionService.setCurrentPeriod(null);
 
-    // Auto-start break if setting enabled
-    if (settings.autoStartBreak) {
-      startBreakSession();
+    // If we're transitioning to a break session, start it now
+    if (transitionToBreak) {
+      console.log("AlarmContext: Transitioning to break session");
+      await startBreakSession();
     }
   };
 
-  const startBreakSession = () => {
+  const startBreakSession = async () => {
     if (currentSession && currentSession.type === "break") return;
+
+    // Reset all session state
+    isOvertimeRef.current = false;
+    setIsOvertime(false);
+    setNextBreakDuration(null);
+
+    // Clear any existing period/session first to avoid duplicates
+    await SessionService.setCurrentPeriod(null);
 
     // Use custom break duration if set, otherwise use from settings
     const breakDuration =
@@ -349,9 +457,9 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     // Create new break session
     const newSession: PomodoroSession = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       taskDescription: "Break",
-      projectId: "break",
+      projectId: currentSession?.projectId || "break",
       startTime: new Date(),
       duration: breakDuration,
       isCompleted: false,
@@ -359,8 +467,30 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       type: "break",
     };
 
-    // Reset custom break duration after using it
-    setNextBreakDuration(null);
+    try {
+      // Create new break session in DB or update existing session
+      // For simplicity in MVP, we'll create a new session for breaks too
+      await SessionService.createSession({
+        id: newSession.id,
+        task: "Break",
+        project_id: newSession.projectId,
+        status: "in_progress",
+      });
+
+      console.log("AlarmContext: Created break session in DB", newSession.id);
+
+      // Create rest period
+      await SessionService.createPeriod({
+        session_id: newSession.id,
+        type: "rest",
+        planned_duration_minutes: breakDuration,
+        started_at: new Date().toISOString(),
+      });
+
+      console.log("AlarmContext: Created rest period in DB");
+    } catch (error) {
+      console.error("AlarmContext: Error creating break session in DB:", error);
+    }
 
     setCurrentSession(newSession);
     setRemainingSeconds(breakDuration * 60);
@@ -477,6 +607,59 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
+  // Add a function to handle cancellation, which we should update
+  const handleCancelSession = async () => {
+    console.log("AlarmContext: Cancelling session", currentSession?.id);
+
+    if (!currentSession) return;
+
+    try {
+      // Get the current period
+      const currentPeriod = await SessionService.getCurrentPeriod();
+
+      if (currentPeriod) {
+        // Calculate actual duration up to now
+        const startTime = new Date(currentSession.startTime);
+        const endTime = new Date();
+        const actualSeconds = Math.floor(
+          (endTime.getTime() - startTime.getTime()) / 1000
+        );
+
+        // Update period as incomplete
+        await SessionService.updatePeriod(currentPeriod.id, {
+          actual_duration_minutes: actualSeconds / 60, // Convert back to minutes for storage
+          ended_at: new Date().toISOString(),
+          completed: false,
+        });
+
+        console.log("AlarmContext: Updated period for cancelled session");
+
+        // Update session as cancelled
+        await SessionService.updateSession(currentSession.id, {
+          status: "cancelled",
+          cancelled_reason: "User cancelled",
+          completed: false,
+        });
+
+        console.log("AlarmContext: Updated session as cancelled");
+
+        // Force sync
+        await SessionService.syncToSupabase();
+      }
+    } catch (error) {
+      console.error("AlarmContext: Error cancelling session in DB:", error);
+    }
+
+    // Continue with existing UI state updates
+    stopTimer();
+    setCurrentSession(null);
+    setTimerStatus(TimerStatus.IDLE);
+    await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+
+    // Clear current period in SessionService
+    await SessionService.setCurrentPeriod(null);
+  };
+
   return (
     <PomodoroContext.Provider
       value={{
@@ -492,6 +675,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         resumeSession,
         completeSession,
         startBreakSession,
+        cancelSession: handleCancelSession,
 
         // Tags
         tags,

@@ -6,7 +6,7 @@ export interface PomodoroSession {
   endTime?: Date;
   duration: number; // in minutes
   isCompleted: boolean;
-  rating?: "happy" | "sad";
+  rating?: number; // 1-5 star rating
   notes?: string;
   tags: string[];
   type: "focus" | "break";
@@ -25,8 +25,6 @@ export interface Project {
 export interface TimerSettings {
   focusDuration: number; // in minutes
   breakDuration: number; // in minutes
-  autoStartBreak: boolean;
-  autoStartNextFocus: boolean;
   soundEnabled?: boolean;
   notificationsEnabled?: boolean;
 }

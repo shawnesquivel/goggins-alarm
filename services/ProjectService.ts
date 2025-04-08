@@ -361,9 +361,6 @@ export const ProjectService = {
         return await this.getLocalProjects();
       }
 
-      console.log(
-        "Starting bidirectional project sync with timestamp resolution..."
-      );
 
       // Process pending operations first
       const pendingOps = await this.getPendingOperations();
@@ -608,7 +605,13 @@ export const ProjectService = {
   // Helper function to remove a pending operation
   async removePendingOperation(operationId: string): Promise<void> {
     const pendingOps = await this.getPendingOperations();
-    const updatedOps = pendingOps.filter((op) => op.data.id !== operationId);
+    // Also check for duplicate operations with the same ID
+    const updatedOps = pendingOps.filter((op) => {
+      if (op.type === "insert" || op.type === "update") {
+        return op.data.id !== operationId;
+      }
+      return true;
+    });
     await this.savePendingOperations(updatedOps);
   },
 

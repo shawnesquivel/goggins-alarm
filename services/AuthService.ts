@@ -32,7 +32,7 @@ export const AuthService = {
    */
   onAuthStateChange(callback: (user: any, event: string) => void) {
     const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event);
+      console.log("Auth Event:", event);
 
       // If the user just signed in or token refreshed, ensure user profile exists
       if (

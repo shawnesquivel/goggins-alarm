@@ -28,7 +28,6 @@ export default function AuthTestScreen() {
 
     // Set up auth state listener
     const subscription = AuthService.onAuthStateChange((newUser, event) => {
-      console.log("Auth state changed in component:", event);
       setUser(newUser);
       setStatus(`Auth state changed: ${event}`);
     });

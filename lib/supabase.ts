@@ -40,13 +40,31 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 // to receive `onAuthStateChange` events with the `TOKEN_REFRESHED` or
 // `SIGNED_OUT` event if the user's session is terminated. This should
 // only be registered once.
-AppState.addEventListener("change", (state) => {
-  if (state === "active") {
-    supabase.auth.startAutoRefresh();
-  } else {
-    supabase.auth.stopAutoRefresh();
+let appStateSubscription: { remove: () => void } | null = null;
+
+try {
+  appStateSubscription = AppState.addEventListener("change", (state) => {
+    if (state === "active") {
+      supabase.auth.startAutoRefresh();
+    } else {
+      supabase.auth.stopAutoRefresh();
+    }
+  });
+} catch (error) {
+  console.error("Error setting up AppState listener:", error);
+}
+
+// Cleanup function to remove the AppState listener
+export function cleanupAppStateListener() {
+  if (appStateSubscription) {
+    try {
+      appStateSubscription.remove();
+      appStateSubscription = null;
+    } catch (error) {
+      console.error("Error cleaning up AppState listener:", error);
+    }
   }
-});
+}
 
 // Helper functions for database operations
 export async function getCurrentUser() {

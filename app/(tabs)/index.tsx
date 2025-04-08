@@ -19,6 +19,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useProjects } from "@/contexts/ProjectContext";
+import SessionDebugPanel from "@/components/debug/SessionDebugPanel";
 import { format } from "date-fns";
 import { ExportModal } from "@/components/shared/modals/ExportModal";
 import { HeaderRight } from "@/components/shared/HeaderRight";
@@ -36,6 +37,7 @@ export default function TimerScreen() {
     startBreakSession,
     settings,
     isOvertime,
+    cancelSession,
   } = usePomodoro();
   const { session } = useAuth();
   const { projects } = useProjects();
@@ -53,6 +55,9 @@ export default function TimerScreen() {
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
   const [starRating, setStarRating] = useState<number>(0);
   const [selectedRestActivities, setSelectedRestActivities] = useState<
+    string[]
+  >([]);
+  const [selectedBreakActivities, setSelectedBreakActivities] = useState<
     string[]
   >([]);
   const [showExportModal, setShowExportModal] = useState(false);
@@ -77,21 +82,17 @@ export default function TimerScreen() {
 
   // Format remaining time as mm:ss
   const formatTimeDisplay = (seconds: number): string => {
-    console.log(
-      `Formatting time - seconds: ${seconds}, isOvertime: ${isOvertime}`
-    );
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     const timeString = `${mins.toString().padStart(2, "0")}:${secs
       .toString()
       .padStart(2, "0")}`;
-    console.log(`Formatted time: ${isOvertime ? "+" : ""}${timeString}`);
     return `${isOvertime ? "+" : ""}${timeString}`;
   };
 
   // Handle session completion and rating
   const handleCompleteSession = () => {
-    completeSession(starRating >= 3 ? "happy" : "sad", sessionNotes);
+    completeSession(starRating, sessionNotes, true, selectedBreakActivities);
     setShowRatingModal(false);
     setSessionNotes("");
     setStarRating(0);
@@ -110,14 +111,12 @@ export default function TimerScreen() {
 
   // Updated handler for break session completion
   const handleCompleteBreakSession = () => {
-    // Join selected activities into a single string for notes
-    const activityNotes =
-      selectedRestActivities.length > 0
-        ? `Activities: ${selectedRestActivities.join(", ")}`
-        : "";
-
-    // Use the notes
-    completeSession("happy", activityNotes);
+    completeSession(
+      undefined, // No rating for breaks
+      undefined, // No notes needed since we have activities
+      false, // Don't transition to break
+      selectedRestActivities // Pass the selected activities
+    );
     setShowBreakRatingModal(false);
     setSelectedRestActivities([]);
   };
@@ -161,7 +160,7 @@ export default function TimerScreen() {
 
   // Confirm cancellation and reset the session
   const confirmCancelSession = () => {
-    completeSession(); // Complete the session without rating
+    cancelSession(); // Use cancelSession instead of completeSession
     setShowCancelConfirmation(false);
   };
 
@@ -203,7 +202,10 @@ export default function TimerScreen() {
       <View className="absolute w-full h-full bg-[#f5f5f0] z-50 justify-center items-center">
         <View className="w-[90%] items-center justify-center p-5">
           <View className="absolute top-10 right-5 z-10">
-            <TouchableOpacity className="p-2.5" onPress={handleCancelSession}>
+            <TouchableOpacity
+              className="p-2.5"
+              onPress={() => setIsFullScreen(false)}
+            >
               <FontAwesome name="times" size={24} color="#000" />
             </TouchableOpacity>
           </View>
@@ -266,7 +268,9 @@ export default function TimerScreen() {
           >
             <Text className="text-white text-base font-bold">
               {currentSession?.type === "focus"
-                ? "TAKE A DEEP REST"
+                ? isOvertime
+                  ? "TAKE A DEEP REST"
+                  : "END DEEP WORK EARLY"
                 : "START DEEP WORK"}
             </Text>
           </TouchableOpacity>
@@ -332,6 +336,9 @@ export default function TimerScreen() {
     );
   };
 
+  const renderSessionDebug = () => {
+    if (!__DEV__) return null;
+    return <SessionDebugPanel />;
   // Add this helper function near your other utility functions
   const formatDurationForExport = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -348,6 +355,9 @@ export default function TimerScreen() {
     >
       {/* Auth Debug Panel (only in development mode) */}
       {__DEV__ && renderAuthDebug()}
+
+      {/* Session Debug Panel (only in development mode) */}
+      {__DEV__ && renderSessionDebug()}
 
       {/* Timer Display */}
       <View className="items-center py-10">
@@ -382,6 +392,14 @@ export default function TimerScreen() {
               >
                 {formatTimeDisplay(remainingSeconds)}
               </Text>
+
+              {/* Full Screen Button */}
+              <TouchableOpacity
+                className="absolute top-2 right-2 p-2"
+                onPress={() => setIsFullScreen(true)}
+              >
+                <FontAwesome name="expand" size={16} color="#666" />
+              </TouchableOpacity>
             </View>
 
             {/* Overtime info */}
@@ -405,7 +423,7 @@ export default function TimerScreen() {
             <TouchableOpacity
               className="bg-black py-4 px-6 rounded-md items-center w-full mb-3"
               onPress={() => {
-                if (currentSession.type === "focus") {
+                if (currentSession?.type === "focus") {
                   setShowRatingModal(true);
                 } else {
                   setShowBreakRatingModal(true);
@@ -413,8 +431,10 @@ export default function TimerScreen() {
               }}
             >
               <Text className="text-white text-base font-bold">
-                {currentSession.type === "focus"
-                  ? "TAKE A DEEP REST"
+                {currentSession?.type === "focus"
+                  ? isOvertime
+                    ? "TAKE A DEEP REST"
+                    : "END DEEP WORK EARLY"
                   : "START DEEP WORK"}
               </Text>
             </TouchableOpacity>

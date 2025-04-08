@@ -11,10 +11,18 @@ import { useProjects } from "@/contexts/ProjectContext";
 import { Project } from "@/types/project";
 import ProjectModal from "@/components/shared/modals/ProjectModal";
 import DeleteConfirmationModal from "@/components/shared/modals/DeleteConfirmationModal";
+import { ProjectService } from "@/services/ProjectService";
 
 export default function ProjectsScreen() {
-  const { projects, addProject, updateProject, deleteProject, loading } =
-    useProjects();
+  const {
+    projects,
+    addProject,
+    updateProject,
+    deleteProject,
+    loading,
+    pendingOps,
+    errorCount,
+  } = useProjects();
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | undefined>();
@@ -65,6 +73,10 @@ export default function ProjectsScreen() {
       setProjectToDelete("");
     }
     setShowDeleteModal(false);
+  };
+
+  const clearPendingOperations = () => {
+    ProjectService.cleanupPendingOperations();
   };
 
   return (
@@ -136,35 +148,52 @@ export default function ProjectsScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Keeping your original red button */}
-            {/* {__DEV__ && (
+            {/* Debug Panel - Always visible regardless of __DEV__ */}
+            <View className="mt-4 p-3 bg-gray-100 rounded-md border border-gray-300">
+              <Text className="text-sm font-bold mb-2">
+                Project Debug Panel
+              </Text>
+              <Text className="text-xs mb-1">
+                Pending Ops: {pendingOps.length} ({errorCount} potential
+                duplicates)
+              </Text>
+              {pendingOps.slice(0, 3).map((op, i) => (
+                <Text key={i} className="text-xs text-gray-600 mb-1">
+                  {op.type}: {op.data?.name || op.data?.id || "unknown"}
+                </Text>
+              ))}
+              {pendingOps.length > 3 && (
+                <Text className="text-xs text-gray-600 mb-2">
+                  ...and {pendingOps.length - 3} more
+                </Text>
+              )}
               <TouchableOpacity
-                className="bg-red-500 py-3 rounded-lg items-center"
-                onPress={() => ProjectService.cleanupPendingOperations()}
+                className="bg-red-500 py-2 rounded-md items-center mt-2"
+                onPress={clearPendingOperations}
               >
-                <Text className="text-white font-medium">
+                <Text className="text-white font-medium text-sm">
                   Clear All Pending Operations
                 </Text>
               </TouchableOpacity>
-            )} */}
+            </View>
+
+            {/* Project Modal */}
+            <ProjectModal
+              visible={showProjectModal}
+              onClose={() => setShowProjectModal(false)}
+              project={selectedProject}
+              onSave={handleSaveProject}
+              mode={selectedProject ? "edit" : "add"}
+            />
+
+            {/* Delete Confirmation Modal */}
+            <DeleteConfirmationModal
+              visible={showDeleteModal}
+              onClose={() => setShowDeleteModal(false)}
+              onConfirm={handleConfirmDelete}
+            />
           </ScrollView>
         )}
-
-        {/* Project Modal */}
-        <ProjectModal
-          visible={showProjectModal}
-          onClose={() => setShowProjectModal(false)}
-          project={selectedProject}
-          onSave={handleSaveProject}
-          mode={selectedProject ? "edit" : "add"}
-        />
-
-        {/* Delete Confirmation Modal */}
-        <DeleteConfirmationModal
-          visible={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
-          onConfirm={handleConfirmDelete}
-        />
       </View>
     </SafeAreaView>
   );
