@@ -36,7 +36,7 @@ export default function TimerSetupScreen({
 }: TimerSetupScreenProps) {
   const { settings, updateSettings } = usePomodoro();
   const [focusDuration, setFocusDuration] = useState(30);
-  const [breakDuration, setBreakDuration] = useState(5);
+  const [breakDuration, setBreakDuration] = useState(0.0833);
   const [fontsLoaded] = useFonts({
     LibreCaslonText_400Regular,
   });

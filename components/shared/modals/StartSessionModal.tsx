@@ -21,15 +21,17 @@ export default function StartSessionModal({
   onClose,
   onSessionStart,
 }: StartSessionModalProps) {
-  const { startFocusSession } = usePomodoro();
+  const { startFocusSession, settings } = usePomodoro();
   const { projects, loading } = useProjects();
-
-  const [taskDescription, setTaskDescription] = useState("");
+  const [taskDescription, setTaskDescription] = useState(
+    "Test Description: Code"
+  );
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [sessionDuration, setSessionDuration] = useState(25);
-  const [isListening, setIsListening] = useState(false);
+  const [breakDuration, setBreakDuration] = useState(settings.breakDuration);
 
-  const sessionDurations = [0.167, 1, 5, 15, 25, 45, 60];
+  const sessionDurations = [0.05, 1, 5, 15, 25, 45, 60];
+  const breakDurations = [0.05, 1, 5, 10, 15, 20];
 
   useEffect(() => {
     if (projects.length > 0 && !selectedProjectId) {
@@ -39,7 +41,16 @@ export default function StartSessionModal({
 
   const handleStartSession = () => {
     if (!taskDescription || !selectedProjectId) return;
-    startFocusSession(taskDescription, selectedProjectId, [], sessionDuration);
+
+    // Pass both session duration and break duration
+    startFocusSession(
+      taskDescription,
+      selectedProjectId,
+      [],
+      sessionDuration,
+      breakDuration
+    );
+
     if (onSessionStart) onSessionStart();
     onClose();
   };
@@ -51,7 +62,7 @@ export default function StartSessionModal({
     projects.length === 0;
 
   const getDurationLabel = (duration: number): string => {
-    if (duration === 0.167) return "10s";
+    if (duration === 0.05) return "3s";
     return `${duration}`;
   };
 
@@ -60,7 +71,7 @@ export default function StartSessionModal({
       <View className="flex-1 justify-center items-center px-4 bg-black/80">
         <View className="w-full max-w-xs bg-white rounded-lg">
           <RNText className="text-lg font-medium text-center py-4 text-black">
-            Start Focus Session
+            Start Deep Work Session
           </RNText>
 
           <View className="px-4 py-3">
@@ -110,7 +121,7 @@ export default function StartSessionModal({
               </ScrollView>
             )}
 
-            <RNText className="text-sm mb-2 text-black">Duration</RNText>
+            <RNText className="text-sm mb-2 text-black">Focus Duration</RNText>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -129,6 +140,33 @@ export default function StartSessionModal({
                   <RNText
                     className={`text-center ${
                       sessionDuration === duration ? "text-white" : "text-black"
+                    }`}
+                  >
+                    {getDurationLabel(duration)}
+                  </RNText>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <RNText className="text-sm mb-2 text-black">Break Duration</RNText>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              className="mb-4"
+            >
+              {breakDurations.map((duration) => (
+                <TouchableOpacity
+                  key={`break-${duration}`}
+                  onPress={() => setBreakDuration(duration)}
+                  className={`mr-2 px-4 py-2 rounded ${
+                    breakDuration === duration
+                      ? "bg-black"
+                      : "border border-gray-200"
+                  }`}
+                >
+                  <RNText
+                    className={`text-center ${
+                      breakDuration === duration ? "text-white" : "text-black"
                     }`}
                   >
                     {getDurationLabel(duration)}

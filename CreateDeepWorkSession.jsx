@@ -7,7 +7,7 @@ const CreateDeepWorkSession = ({ userId }) => {
   const [selectedProject, setSelectedProject] = useState(null);
   const [task, setTask] = useState("");
   const [workMinutes, setWorkMinutes] = useState(30);
-  const [restMinutes, setRestMinutes] = useState(5);
+  const [restMinutes, setRestMinutes] = useState(0.1);
   const [intentionTranscription, setIntentionTranscription] = useState("");
 
   // Session tracking state

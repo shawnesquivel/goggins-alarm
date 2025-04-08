@@ -28,13 +28,15 @@ interface PomodoroContextType {
   timerStatus: TimerStatus;
   currentSession: PomodoroSession | null;
   remainingSeconds: number;
+  isOvertime: boolean;
 
   // Session management
   startFocusSession: (
     taskDescription: string,
     projectId: string,
     tags: string[],
-    customDuration?: number
+    customDuration?: number,
+    customBreakDuration?: number
   ) => void;
   pauseSession: () => void;
   resumeSession: () => void;
@@ -92,10 +94,15 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   );
   const [timerStatus, setTimerStatus] = useState<TimerStatus>(TimerStatus.IDLE);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
+  const [isOvertime, setIsOvertime] = useState<boolean>(false);
+  const [nextBreakDuration, setNextBreakDuration] = useState<number | null>(
+    null
+  );
 
   // References
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
+  const isOvertimeRef = useRef(false);
 
   // Load saved data when component mounts
   useEffect(() => {
@@ -174,22 +181,49 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Add this after your other useEffects
+  useEffect(() => {
+    console.log(`⚠️ isOvertime STATE CHANGED to: ${isOvertime}`);
+
+    // When overtime state changes, let's make sure the timer updates properly
+    if (isOvertime && timerStatus === TimerStatus.RUNNING) {
+      console.log(
+        "Overtime state changed while timer running, checking timer state"
+      );
+      if (remainingSeconds <= 0) {
+        console.log(
+          "Remaining seconds is <= 0, setting to 1 for overtime start"
+        );
+        setRemainingSeconds(1);
+      }
+    }
+  }, [isOvertime]);
+
   // Timer functions
   const startTimer = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
+      console.log("Timer cleared, creating new interval");
     }
 
     timerRef.current = setInterval(() => {
       setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          // Timer complete
+        console.log(
+          `Timer tick - Previous seconds: ${prev}, isOvertime ref: ${isOvertimeRef.current}, state: ${isOvertime}`
+        );
+
+        if (prev <= 0 && !isOvertimeRef.current) {
           playTimerCompleteSound();
-          clearInterval(timerRef.current!);
-          setTimerStatus(TimerStatus.COMPLETED);
-          return 0;
+
+          isOvertimeRef.current = true;
+          setIsOvertime(true);
+
+          return 1;
+        } else if (isOvertimeRef.current) {
+          return prev + 1;
+        } else {
+          return prev - 1;
         }
-        return prev - 1;
       });
     }, 1000);
   };
@@ -204,11 +238,13 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   // Sound functions
   const playTimerCompleteSound = async () => {
     try {
-      const { sound } = await Audio.Sound.createAsync(
-        require("@/assets/sounds/timer-complete.mp3")
-      );
-      soundRef.current = sound;
-      await sound.playAsync();
+      console.log("⚠️ SOUND: Playing timer complete sound");
+      console.log("⚠️ Current isOvertime state:", isOvertime);
+      // const { sound } = await Audio.Sound.createAsync(
+      //   require("@/assets/sounds/timer-complete.mp3")
+      // );
+      // soundRef.current = sound;
+      // await sound.playAsync();
     } catch (error) {
       console.error("Error playing sound:", error);
     }
@@ -219,11 +255,19 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     taskDescription: string,
     projectId: string,
     tags: string[],
-    customDuration?: number
+    customDuration?: number,
+    customBreakDuration?: number
   ) => {
     // Create new session with either custom duration or default from settings
     const duration =
       customDuration !== undefined ? customDuration : settings.focusDuration;
+
+    // Store custom break duration for next break if provided
+    if (customBreakDuration !== undefined) {
+      setNextBreakDuration(customBreakDuration);
+    } else {
+      setNextBreakDuration(null);
+    }
 
     const newSession: PomodoroSession = {
       id: Date.now().toString(),
@@ -266,6 +310,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     stopTimer();
 
+    // Reset overtime state
+    isOvertimeRef.current = false;
+    setIsOvertime(false);
+
     // Update session with completion data
     const completedSession = {
       ...currentSession,
@@ -295,20 +343,27 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const startBreakSession = () => {
     if (currentSession && currentSession.type === "break") return;
 
+    // Use custom break duration if set, otherwise use from settings
+    const breakDuration =
+      nextBreakDuration !== null ? nextBreakDuration : settings.breakDuration;
+
     // Create new break session
     const newSession: PomodoroSession = {
       id: Date.now().toString(),
       taskDescription: "Break",
       projectId: "break",
       startTime: new Date(),
-      duration: settings.breakDuration,
+      duration: breakDuration,
       isCompleted: false,
       tags: [],
       type: "break",
     };
 
+    // Reset custom break duration after using it
+    setNextBreakDuration(null);
+
     setCurrentSession(newSession);
-    setRemainingSeconds(settings.breakDuration * 60);
+    setRemainingSeconds(breakDuration * 60);
     setTimerStatus(TimerStatus.RUNNING);
 
     // Save current session
@@ -429,6 +484,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         timerStatus,
         currentSession,
         remainingSeconds,
+        isOvertime,
 
         // Session management
         startFocusSession,

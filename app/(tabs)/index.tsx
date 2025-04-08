@@ -32,6 +32,7 @@ export default function TimerScreen() {
     completeSession,
     startBreakSession,
     settings,
+    isOvertime,
   } = usePomodoro();
   const { session } = useAuth();
   const { projects } = useProjects();
@@ -44,27 +45,73 @@ export default function TimerScreen() {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showBreakRatingModal, setShowBreakRatingModal] = useState(false);
   const [sessionNotes, setSessionNotes] = useState("");
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
+  const [starRating, setStarRating] = useState<number>(0);
+  const [selectedRestActivities, setSelectedRestActivities] = useState<
+    string[]
+  >([]);
 
   // Format remaining time as mm:ss
   const formatTimeDisplay = (seconds: number): string => {
+    console.log(
+      `Formatting time - seconds: ${seconds}, isOvertime: ${isOvertime}`
+    );
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs
+    const timeString = `${mins.toString().padStart(2, "0")}:${secs
       .toString()
       .padStart(2, "0")}`;
+    console.log(`Formatted time: ${isOvertime ? "+" : ""}${timeString}`);
+    return `${isOvertime ? "+" : ""}${timeString}`;
   };
 
   // Handle session completion and rating
-  const handleCompleteSession = (rating?: "happy" | "sad") => {
-    completeSession(rating, sessionNotes);
+  const handleCompleteSession = () => {
+    completeSession(starRating >= 3 ? "happy" : "sad", sessionNotes);
     setShowRatingModal(false);
     setSessionNotes("");
+    setStarRating(0);
+  };
+
+  // Toggle selected activity
+  const toggleRestActivity = (activity: string) => {
+    if (selectedRestActivities.includes(activity)) {
+      setSelectedRestActivities(
+        selectedRestActivities.filter((a) => a !== activity)
+      );
+    } else {
+      setSelectedRestActivities([...selectedRestActivities, activity]);
+    }
+  };
+
+  // Updated handler for break session completion
+  const handleCompleteBreakSession = () => {
+    // Join selected activities into a single string for notes
+    const activityNotes =
+      selectedRestActivities.length > 0
+        ? `Activities: ${selectedRestActivities.join(", ")}`
+        : "";
+
+    // Use the notes
+    completeSession("happy", activityNotes);
+    setShowBreakRatingModal(false);
+    setSelectedRestActivities([]);
   };
 
   // Handle timer controls
   const handleTimerControls = () => {
+    // If in overtime mode and running, complete the session instead of pausing
+    if (isOvertime && timerStatus === TimerStatus.RUNNING) {
+      if (currentSession?.type === "break") {
+        setShowBreakRatingModal(true);
+      } else {
+        setShowRatingModal(true);
+      }
+      return;
+    }
+
     switch (timerStatus) {
       case TimerStatus.RUNNING:
         pauseSession();
@@ -73,7 +120,11 @@ export default function TimerScreen() {
         resumeSession();
         break;
       case TimerStatus.COMPLETED:
-        setShowRatingModal(true);
+        if (currentSession?.type === "break") {
+          setShowBreakRatingModal(true);
+        } else {
+          setShowRatingModal(true);
+        }
         break;
       default:
         setShowStartModal(true);
@@ -94,6 +145,11 @@ export default function TimerScreen() {
 
   // Get appropriate button text based on timer status
   const getButtonText = (): string => {
+    // If in overtime mode, always show "Complete" instead of "Pause"
+    if (isOvertime && timerStatus === TimerStatus.RUNNING) {
+      return "Complete";
+    }
+
     switch (timerStatus) {
       case TimerStatus.RUNNING:
         return "Pause";
@@ -121,57 +177,84 @@ export default function TimerScreen() {
   // Full screen timer component
   const FullScreenTimer = () => {
     if (!fontsLoaded) return null;
-
     return (
-      <View className="absolute w-full h-full bg-black z-50 justify-center items-center">
-        <View className="w-full items-center justify-center p-5">
+      <View className="absolute w-full h-full bg-[#f5f5f0] z-50 justify-center items-center">
+        <View className="w-[90%] items-center justify-center p-5">
           <View className="absolute top-10 right-5 z-10">
             <TouchableOpacity className="p-2.5" onPress={handleCancelSession}>
-              <FontAwesome name="times" size={24} color="#fff" />
+              <FontAwesome name="times" size={24} color="#000" />
             </TouchableOpacity>
           </View>
 
-          <Text className="text-xl font-medium text-white text-center mb-5">
-            {currentSession?.taskDescription}
+          <Text className="text-3xl font-bold italic mb-2 text-center">
+            Deep {currentSession?.type === "focus" ? "Work" : "Rest"}
           </Text>
-          <Text
-            className="text-[96px] font-bold text-white tracking-wider mb-5"
-            style={{ fontFamily: "LibreCaslonText_400Regular" }}
+
+          <Text className="text-sm text-gray-600 text-center uppercase mb-1">
+            {currentSession?.type === "focus" ? "WORKING ON:" : "RESTING FROM:"}
+          </Text>
+          <Text className="text-base mb-6 text-center">
+            {currentSession?.taskDescription !== "Break"
+              ? currentSession?.taskDescription
+              : getProjectName(currentSession?.projectId || "")}
+          </Text>
+
+          {/* Timer in white box */}
+          <View
+            className={`bg-white rounded-md p-8 mb-6 shadow-md w-[80%] items-center ${
+              isOvertime ? "bg-gray-100" : "bg-white"
+            }`}
           >
-            {formatTimeDisplay(remainingSeconds)}
-          </Text>
-          {currentSession?.type === "focus" && (
+            <Text
+              className={`text-[80px] font-bold ${
+                isOvertime ? "text-black" : "text-black"
+              }`}
+              style={{ fontFamily: "LibreCaslonText_400Regular" }}
+            >
+              {formatTimeDisplay(remainingSeconds)}
+            </Text>
+          </View>
+
+          {/* Overtime info */}
+          {isOvertime && (
             <>
-              <Text className="text-lg text-gray-300 mb-2.5">
-                {getProjectName(currentSession.projectId)}
+              <Text className="text-sm font-medium text-black mb-1 flex-row items-center">
+                <FontAwesome name="check" size={12} color="#000" /> YOU HIT YOUR
+                GOAL OF {currentSession?.duration} MIN
               </Text>
-              {getProjectGoal(currentSession.projectId) && (
-                <Text className="text-base text-gray-400 italic mb-10">
-                  Goal: {getProjectGoal(currentSession.projectId)}
-                </Text>
-              )}
+              <Text className="text-sm text-gray-600 mb-4">
+                TIME ELAPSED: {Math.floor(currentSession?.duration || 0)}:
+                {(((currentSession?.duration || 0) % 1) * 60)
+                  .toFixed(0)
+                  .padStart(2, "0")}
+              </Text>
             </>
           )}
 
-          <View className="items-center">
-            <TouchableOpacity
-              className="bg-blue-500 px-8 py-4 rounded-lg mb-4 min-w-[200px] items-center"
-              onPress={handleTimerControls}
-            >
-              <Text className="text-white text-lg font-bold">
-                {getButtonText()}
-              </Text>
-            </TouchableOpacity>
+          {/* Action Buttons */}
+          <TouchableOpacity
+            className="bg-black py-4 px-6 rounded-md items-center w-full mb-3"
+            onPress={() => {
+              if (currentSession?.type === "focus") {
+                setShowRatingModal(true);
+              } else {
+                setShowBreakRatingModal(true);
+              }
+            }}
+          >
+            <Text className="text-white text-base font-bold">
+              {currentSession?.type === "focus"
+                ? "TAKE A DEEP REST"
+                : "START DEEP WORK"}
+            </Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              className="bg-white/20 px-8 py-4 rounded-lg min-w-[200px] items-center"
-              onPress={() => setIsFullScreen(false)}
-            >
-              <Text className="text-white text-lg font-bold">
-                Exit Full Screen
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            className="py-3 px-6 rounded-md items-center w-full"
+            onPress={handleCancelSession}
+          >
+            <Text className="text-black text-base">END WORK SESSION</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -227,61 +310,96 @@ export default function TimerScreen() {
       contentContainerStyle={{ padding: 20 }}
     >
       {/* Auth Debug Panel (only in development mode) */}
-      {__DEV__ && renderAuthDebug()}
+      {/* {__DEV__ && renderAuthDebug()} */}
 
       {/* Timer Display */}
       <View className="items-center py-10">
         {currentSession ? (
           <>
-            <Text className="text-lg mb-5 text-center">
-              {currentSession.taskDescription}
+            <Text className="text-2xl font-bold italic mb-2 text-center">
+              Deep {currentSession.type === "focus" ? "Work" : "Rest"}
             </Text>
-            <Text
-              className="text-[72px] font-bold mb-5"
-              style={{ fontFamily: "LibreCaslonText_400Regular" }}
+
+            <Text className="text-sm text-gray-600 text-center uppercase mb-1">
+              {currentSession.type === "focus"
+                ? "WORKING ON:"
+                : "RESTING FROM:"}
+            </Text>
+            <Text className="text-base mb-6 text-center">
+              {currentSession.taskDescription !== "Break"
+                ? currentSession.taskDescription
+                : getProjectName(currentSession.projectId)}
+            </Text>
+
+            {/* Timer in white box */}
+            <View
+              className={`bg-white rounded-md p-6 mb-6 shadow-md w-[65%] items-center ${
+                isOvertime ? "bg-gray-100" : "bg-white"
+              }`}
             >
-              {formatTimeDisplay(remainingSeconds)}
-            </Text>
-            <Text className="text-base text-gray-500 mb-8">
-              {getProjectName(currentSession.projectId)}
-            </Text>
-
-            <View className="w-full gap-3">
-              <TouchableOpacity
-                className="bg-blue-500 py-3 px-6 rounded-lg items-center"
-                onPress={handleTimerControls}
+              <Text
+                className={`text-[60px] font-bold ${
+                  isOvertime ? "text-black" : "text-black"
+                }`}
+                style={{ fontFamily: "LibreCaslonText_400Regular" }}
               >
-                <Text className="text-white text-base font-bold">
-                  {getButtonText()}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className="bg-gray-500 py-3 px-6 rounded-lg items-center"
-                onPress={() => setIsFullScreen(true)}
-              >
-                <Text className="text-white text-base font-bold">
-                  Full Screen
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className="bg-red-500 py-3 px-6 rounded-lg items-center"
-                onPress={handleCancelSession}
-              >
-                <Text className="text-white text-base font-bold">Cancel</Text>
-              </TouchableOpacity>
+                {formatTimeDisplay(remainingSeconds)}
+              </Text>
             </View>
+
+            {/* Overtime info */}
+            {isOvertime && (
+              <>
+                <Text className="text-sm font-medium text-black mb-1 flex-row items-center">
+                  <FontAwesome name="check" size={12} color="#000" /> YOU HIT
+                  YOUR GOAL OF {currentSession.duration} MIN
+                </Text>
+                <Text className="text-sm text-gray-600 mb-4">
+                  TIME ELAPSED: {Math.floor(currentSession.duration)}:
+                  {((currentSession.duration % 1) * 60)
+                    .toFixed(0)
+                    .padStart(2, "0")}
+                  {remainingSeconds > 0 ? `:${remainingSeconds}` : ""}
+                </Text>
+              </>
+            )}
+
+            {/* Action Buttons */}
+            <TouchableOpacity
+              className="bg-black py-4 px-6 rounded-md items-center w-full mb-3"
+              onPress={() => {
+                if (currentSession.type === "focus") {
+                  setShowRatingModal(true);
+                } else {
+                  setShowBreakRatingModal(true);
+                }
+              }}
+            >
+              <Text className="text-white text-base font-bold">
+                {currentSession.type === "focus"
+                  ? "TAKE A DEEP REST"
+                  : "START DEEP WORK"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="py-3 px-6 rounded-md items-center w-full"
+              onPress={handleCancelSession}
+            >
+              <Text className="text-black text-base">END WORK SESSION</Text>
+            </TouchableOpacity>
           </>
         ) : (
-          <TouchableOpacity
-            className="bg-blue-500 py-4 px-8 rounded-lg"
-            onPress={() => setShowStartModal(true)}
-          >
-            <Text className="text-white text-lg font-bold">
-              Start Focus Session
-            </Text>
-          </TouchableOpacity>
+          <View className="items-center w-full">
+            <TouchableOpacity
+              className="bg-black py-4 px-6 rounded-md items-center w-full mb-3"
+              onPress={() => setShowStartModal(true)}
+            >
+              <Text className="text-white text-base font-bold">
+                START DEEP WORK
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
 
@@ -291,7 +409,7 @@ export default function TimerScreen() {
         onClose={() => setShowStartModal(false)}
       />
 
-      {/* Rating Modal */}
+      {/* Rating Modal with stars */}
       <Modal
         visible={showRatingModal}
         animationType="slide"
@@ -300,45 +418,145 @@ export default function TimerScreen() {
       >
         <View className="flex-1 bg-black/50 justify-center items-center">
           <View className="bg-white rounded-xl p-6 w-[90%] max-w-[400px]">
-            <Text className="text-xl font-bold mb-4 text-center">
-              How was your focus session?
+            <Text className="text-2xl font-medium mb-2 text-center">
+              Rate your
+            </Text>
+            <Text className="text-2xl font-bold mb-6 text-center italic">
+              Deep Work
             </Text>
 
-            <View className="flex-row justify-around mb-6">
-              <TouchableOpacity
-                className="items-center p-2.5"
-                onPress={() => handleCompleteSession("happy")}
-              >
-                <FontAwesome name="smile-o" size={32} color="#4CAF50" />
-                <Text className="text-base text-gray-600">Productive</Text>
-              </TouchableOpacity>
+            {currentSession && (
+              <Text className="text-sm text-gray-600 text-center mb-2">
+                YOUR 1ST WORK SESSION ON:
+              </Text>
+            )}
+            <Text className="text-lg mb-8 text-center">
+              {currentSession?.taskDescription || "Creating a landing page"}
+            </Text>
 
-              <TouchableOpacity
-                className="items-center p-2.5"
-                onPress={() => handleCompleteSession("sad")}
-              >
-                <FontAwesome name="frown-o" size={32} color="#F44336" />
-                <Text className="text-base text-gray-600">Distracted</Text>
-              </TouchableOpacity>
+            {/* Star Rating */}
+            <View className="flex-row justify-center mb-8">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => setStarRating(star)}
+                  className="mx-2"
+                >
+                  <FontAwesome
+                    name={starRating >= star ? "star" : "star-o"}
+                    size={36}
+                    color={starRating >= star ? "#FFD700" : "#CCCCCC"}
+                  />
+                </TouchableOpacity>
+              ))}
             </View>
 
-            <Text className="text-base text-gray-800 mb-2">
-              Session Notes (optional):
+            <Text className="text-sm text-gray-500 text-center mb-8">
+              TIME ELAPSED:{" "}
+              {currentSession
+                ? Math.round(
+                    (new Date().getTime() -
+                      new Date(currentSession.startTime).getTime()) /
+                      60000
+                  )
+                : 0}{" "}
+              min
             </Text>
-            <TextInput
-              className="border border-gray-300 rounded-lg p-3 text-base h-[100px] mb-4"
-              multiline={true}
-              value={sessionNotes}
-              onChangeText={setSessionNotes}
-              placeholder="What did you accomplish? What could be improved?"
-              textAlignVertical="top"
-            />
 
             <TouchableOpacity
-              className="py-2.5 items-center"
-              onPress={() => handleCompleteSession()}
+              className="bg-black py-4 rounded-lg items-center mb-3"
+              onPress={() => {
+                handleCompleteSession();
+                startBreakSession();
+              }}
             >
-              <Text className="text-gray-500 text-base">Skip Rating</Text>
+              <Text className="text-white text-base font-medium">
+                START DEEP REST
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="py-3 rounded-lg items-center"
+              onPress={() => {
+                handleCompleteSession();
+              }}
+            >
+              <Text className="text-gray-800 text-base">END WORK SESSION</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Break Rating Modal */}
+      <Modal
+        visible={showBreakRatingModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowBreakRatingModal(false)}
+      >
+        <View className="flex-1 bg-black/50 justify-center items-center">
+          <View className="bg-white rounded-xl p-6 w-[90%] max-w-[400px]">
+            <Text className="text-2xl font-medium text-center mb-1">
+              What did you do
+            </Text>
+            <Text className="text-2xl font-medium italic text-center mb-6">
+              for Deep Rest
+            </Text>
+
+            {currentSession && (
+              <>
+                <Text className="text-sm text-gray-600 text-center mb-1">
+                  YOUR 1ST REST SESSION ON:
+                </Text>
+                <Text className="text-base text-center mb-6">
+                  {getProjectName(currentSession.projectId)}
+                </Text>
+              </>
+            )}
+
+            {/* Activity selection buttons */}
+            {[
+              "SOMETHING ACTIVE",
+              "REFUELLED",
+              "SOMETHING MINDFUL",
+              "DOOM SCROLLED",
+            ].map((activity) => (
+              <TouchableOpacity
+                key={activity}
+                className={`py-3 px-4 mb-3 rounded-md ${
+                  selectedRestActivities.includes(activity)
+                    ? "bg-gray-200 border border-gray-300"
+                    : "bg-gray-100"
+                } flex-row justify-between items-center`}
+                onPress={() => toggleRestActivity(activity)}
+              >
+                <Text className="text-base text-gray-800">{activity}</Text>
+                {selectedRestActivities.includes(activity) && (
+                  <FontAwesome name="check" size={16} color="#666" />
+                )}
+              </TouchableOpacity>
+            ))}
+
+            <TouchableOpacity
+              className="bg-black py-4 rounded-lg items-center mt-4 mb-3"
+              onPress={() => {
+                handleCompleteBreakSession();
+                // Start another focus session
+                setShowStartModal(true);
+              }}
+            >
+              <Text className="text-white text-base font-medium">
+                START DEEP WORK
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="py-3 rounded-lg items-center"
+              onPress={() => {
+                handleCompleteBreakSession();
+              }}
+            >
+              <Text className="text-gray-800 text-base">END WORK SESSION</Text>
             </TouchableOpacity>
           </View>
         </View>

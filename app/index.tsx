@@ -12,16 +12,8 @@ export default function InitialRouteScreen() {
 
   const isLoading = isOnboardingLoading || isAuthLoading;
 
-  console.log("[IndexScreen] Rendering.", {
-    isLoading,
-    isOnboarding,
-    isAuthenticated: !!session,
-    isNavigatorReady: !!rootNavigationState?.key,
-  });
-
   // If navigation system isn't ready yet, return null (or loading indicator)
   if (!rootNavigationState?.key) {
-    console.log("[IndexScreen] Navigation not ready yet, waiting...");
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
@@ -31,7 +23,6 @@ export default function InitialRouteScreen() {
 
   // If still loading status, show loading indicator
   if (isLoading) {
-    console.log("[IndexScreen] Still loading status...");
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
@@ -43,17 +34,14 @@ export default function InitialRouteScreen() {
   // We can safely use the declarative Redirect component
 
   if (isOnboarding) {
-    console.log("[IndexScreen] Navigation ready, redirecting to /onboarding");
     return <Redirect href="/onboarding" />;
   }
 
   // Only check auth if onboarding is complete
   if (!session) {
-    console.log("[IndexScreen] Not authenticated, redirecting to /login");
     return <Redirect href="/login" />;
   }
 
-  console.log("[IndexScreen] Navigation ready, redirecting to /(tabs)");
   return <Redirect href="/(tabs)" />;
 }
 

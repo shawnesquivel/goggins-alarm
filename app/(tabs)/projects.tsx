@@ -1,18 +1,16 @@
 import {
   View,
   Text,
-  FlatList,
   ScrollView,
   TouchableOpacity,
+  SafeAreaView,
   Alert,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useProjects } from "@/contexts/ProjectContext";
-import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Project } from "@/types/project";
 import ProjectModal from "@/components/shared/modals/ProjectModal";
 import DeleteConfirmationModal from "@/components/shared/modals/DeleteConfirmationModal";
-import { ProjectService } from "@/services/ProjectService";
 
 export default function ProjectsScreen() {
   const { projects, addProject, updateProject, deleteProject, loading } =
@@ -69,88 +67,105 @@ export default function ProjectsScreen() {
     setShowDeleteModal(false);
   };
 
-  const renderProject = ({ item }: { item: Project }) => (
-    <View
-      className="bg-white p-4 rounded-lg mb-4 shadow-sm"
-      style={{ borderLeftWidth: 5, borderLeftColor: item.color || "#4A90E2" }}
-    >
-      <View className="flex-row justify-between items-center mb-2">
-        <TouchableOpacity onPress={() => handleEditProject(item)}>
-          <Text className="text-lg font-bold">{item.name}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDeleteProject(item.id)}>
-          <FontAwesome name="trash" size={20} color="#999" />
-        </TouchableOpacity>
-      </View>
-      {item.goal && (
-        <Text className="text-sm text-gray-600 mb-2">Goal: {item.goal}</Text>
-      )}
-      <Text className="text-xs text-gray-400">
-        Created:{" "}
-        {typeof item.createdAt === "object" && item.createdAt instanceof Date
-          ? item.createdAt.toLocaleDateString()
-          : new Date(item.createdAt).toLocaleDateString()}
-      </Text>
-    </View>
-  );
-
   return (
-    <View className="flex-1 p-4 bg-gray-100">
-      {loading ? (
-        <View className="flex-1 items-center justify-center">
-          <Text className="text-gray-500">Loading projects...</Text>
+    <SafeAreaView className="flex-1 bg-[#f5f5f0]">
+      <View className="flex-1 px-4 py-6">
+        {/* Header */}
+        <View className="mb-5">
+          <Text className="text-sm text-gray-600 uppercase">
+            ACCOUNT SETTINGS
+          </Text>
+          <Text className="text-4xl font-bold italic">Projects List</Text>
+          <Text className="text-blue-600 mt-2">
+            Click to edit a project, or add up to 10 projects at a time.
+          </Text>
         </View>
-      ) : (
-        <ScrollView className="flex-1">
-          {projects.length === 0 ? (
-            <View className="items-center justify-center py-10">
-              <Text className="text-base text-gray-400 text-center">
-                No projects yet. Add your first project!
+
+        {loading ? (
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-gray-500">Loading projects...</Text>
+          </View>
+        ) : (
+          <ScrollView
+            className="flex-1 mb-4"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Projects List */}
+            {projects.map((project) => (
+              <TouchableOpacity
+                key={project.id}
+                onPress={() => handleEditProject(project)}
+                className="flex-row items-center mb-4"
+                activeOpacity={0.7}
+              >
+                <View
+                  className="w-6 h-6 rounded-full mr-3 border border-gray-400"
+                  style={{ backgroundColor: project.color || "#ccc" }}
+                />
+                <Text className="text-base">{project.name}</Text>
+              </TouchableOpacity>
+            ))}
+
+            {projects.length === 0 && (
+              <View className="items-center justify-center py-6">
+                <Text className="text-gray-400 text-center">
+                  No projects yet. Add your first project!
+                </Text>
+              </View>
+            )}
+
+            {/* Add Project Text Button */}
+            <TouchableOpacity
+              className="items-center py-3 mb-6"
+              onPress={handleAddProject}
+            >
+              <Text className="text-black text-center">+ Add Project</Text>
+            </TouchableOpacity>
+
+            {/* Save List Button */}
+            <TouchableOpacity className="bg-black py-4 items-center rounded-md mb-3">
+              <Text className="text-white uppercase font-medium">
+                SAVE LIST
               </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={projects}
-              renderItem={renderProject}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          )}
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            className="bg-blue-500 p-3 rounded-lg flex-row items-center justify-center mt-4"
-            onPress={handleAddProject}
-          >
-            <FontAwesome name="plus" size={12} color="#fff" />
-            <Text className="text-white font-bold ml-2">Add Project</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="bg-red-500 p-3 rounded-lg items-center mt-4"
-            onPress={() => ProjectService.cleanupPendingOperations()}
-          >
-            <FontAwesome name="trash" size={12} color="#fff" />
-            <Text className="text-white font-bold">
-              Clear All Pending Operations
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      )}
+            {/* Return Without Saving */}
+            <TouchableOpacity className="py-3 items-center mb-6">
+              <Text className="text-black uppercase text-sm">
+                RETURN WITHOUT SAVING
+              </Text>
+            </TouchableOpacity>
 
-      {/* Project Modal */}
-      <ProjectModal
-        visible={showProjectModal}
-        onClose={() => setShowProjectModal(false)}
-        project={selectedProject}
-        onSave={handleSaveProject}
-        mode={selectedProject ? "edit" : "add"}
-      />
+            {/* Keeping your original red button */}
+            {/* {__DEV__ && (
+              <TouchableOpacity
+                className="bg-red-500 py-3 rounded-lg items-center"
+                onPress={() => ProjectService.cleanupPendingOperations()}
+              >
+                <Text className="text-white font-medium">
+                  Clear All Pending Operations
+                </Text>
+              </TouchableOpacity>
+            )} */}
+          </ScrollView>
+        )}
 
-      {/* Delete Confirmation Modal */}
-      <DeleteConfirmationModal
-        visible={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onConfirm={handleConfirmDelete}
-      />
-    </View>
+        {/* Project Modal */}
+        <ProjectModal
+          visible={showProjectModal}
+          onClose={() => setShowProjectModal(false)}
+          project={selectedProject}
+          onSave={handleSaveProject}
+          mode={selectedProject ? "edit" : "add"}
+        />
+
+        {/* Delete Confirmation Modal */}
+        <DeleteConfirmationModal
+          visible={showDeleteModal}
+          onClose={() => setShowDeleteModal(false)}
+          onConfirm={handleConfirmDelete}
+        />
+      </View>
+    </SafeAreaView>
   );
 }

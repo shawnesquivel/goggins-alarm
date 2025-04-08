@@ -2,17 +2,20 @@ import React, { createContext, useState, useEffect, useContext } from "react";
 import { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { Platform } from "react-native";
+import { useRouter } from "expo-router";
 
 type AuthContextType = {
   session: Session | null;
   isLoading: boolean;
   refreshSession: () => Promise<void>;
+  signOut: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType>({
   session: null,
   isLoading: true,
   refreshSession: async () => {},
+  signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -32,6 +35,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error("Error in session refresh:", err);
+    }
+  };
+
+  // Sign out function
+  const signOut = async () => {
+    try {
+      console.log("Signing out user...");
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error("Error signing out:", error);
+      } else {
+        console.log("User signed out successfully");
+        setSession(null);
+      }
+    } catch (err) {
+      console.error("Error in sign out:", err);
     }
   };
 
@@ -84,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     isLoading,
     refreshSession,
+    signOut,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
