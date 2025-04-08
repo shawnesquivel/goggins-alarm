@@ -613,44 +613,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     if (!currentSession) return;
 
-    try {
-      // Get the current period
-      const currentPeriod = await SessionService.getCurrentPeriod();
-
-      if (currentPeriod) {
-        // Calculate actual duration up to now
-        const startTime = new Date(currentSession.startTime);
-        const endTime = new Date();
-        const actualSeconds = Math.floor(
-          (endTime.getTime() - startTime.getTime()) / 1000
-        );
-
-        // Update period as incomplete
-        await SessionService.updatePeriod(currentPeriod.id, {
-          actual_duration_minutes: actualSeconds / 60, // Convert back to minutes for storage
-          ended_at: new Date().toISOString(),
-          completed: false,
-        });
-
-        console.log("AlarmContext: Updated period for cancelled session");
-
-        // Update session as cancelled
-        await SessionService.updateSession(currentSession.id, {
-          status: "cancelled",
-          cancelled_reason: "User cancelled",
-          completed: false,
-        });
-
-        console.log("AlarmContext: Updated session as cancelled");
-
-        // Force sync
-        await SessionService.syncToSupabase();
-      }
-    } catch (error) {
-      console.error("AlarmContext: Error cancelling session in DB:", error);
-    }
-
-    // Continue with existing UI state updates
+    // Just handle UI state
     stopTimer();
     setCurrentSession(null);
     setTimerStatus(TimerStatus.IDLE);

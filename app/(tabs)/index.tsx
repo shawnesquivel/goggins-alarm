@@ -23,6 +23,7 @@ import SessionDebugPanel from "@/components/debug/SessionDebugPanel";
 import { format } from "date-fns";
 import { ExportModal } from "@/components/shared/modals/ExportModal";
 import { HeaderRight } from "@/components/shared/HeaderRight";
+import { SessionService } from "@/services/SessionService";
 
 export default function TimerScreen() {
   const router = useRouter();
@@ -61,6 +62,7 @@ export default function TimerScreen() {
     string[]
   >([]);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [isTaskComplete, setIsTaskComplete] = useState(false);
 
   // Add export ref
   const exportRef = useRef({
@@ -153,15 +155,320 @@ export default function TimerScreen() {
     }
   };
 
-  // Handle canceling the current session
+  // Add near other state declarations
+  enum CancelFlowStep {
+    NONE,
+    CONFIRM,
+    REFLECT,
+  }
+
+  const [cancelFlowStep, setCancelFlowStep] = useState<CancelFlowStep>(
+    CancelFlowStep.NONE
+  );
+  const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
+
+  // Update existing handler
   const handleCancelSession = () => {
-    setShowCancelConfirmation(true);
+    setCancelFlowStep(CancelFlowStep.CONFIRM);
   };
 
-  // Confirm cancellation and reset the session
-  const confirmCancelSession = () => {
-    cancelSession(); // Use cancelSession instead of completeSession
-    setShowCancelConfirmation(false);
+  // Add new handlers
+  const handleStartReflection = () => {
+    setCancelFlowStep(CancelFlowStep.REFLECT);
+  };
+
+  const handleSubmitReflection = async () => {
+    if (!currentSession) return;
+
+    try {
+      // Get the current period and session from DB to check latest state
+      const currentPeriod = await SessionService.getCurrentPeriod();
+      const dbSession = await SessionService.getSession(currentSession.id);
+
+      // Check if session is already completed or cancelled
+      if (!currentPeriod || !dbSession) {
+        console.log("Session or period not found, already cleaned up");
+        setCancelFlowStep(CancelFlowStep.NONE);
+        setSelectedReasons([]);
+        return;
+      }
+
+      if (
+        dbSession.status === "completed" ||
+        dbSession.status === "cancelled"
+      ) {
+        console.log("Session already", dbSession.status);
+        setCancelFlowStep(CancelFlowStep.NONE);
+        setSelectedReasons([]);
+        return;
+      }
+
+      // Calculate actual duration up to now
+      const startTime = new Date(currentSession.startTime);
+      const endTime = new Date();
+      const actualSeconds = Math.floor(
+        (endTime.getTime() - startTime.getTime()) / 1000
+      );
+
+      // Update period with reflection data
+      await SessionService.updatePeriod(currentPeriod.id, {
+        actual_duration_minutes: actualSeconds / 60,
+        ended_at: new Date().toISOString(),
+        completed: false,
+        distraction_reasons_selected:
+          selectedReasons.length > 0 ? selectedReasons : null,
+      });
+
+      // Update session with reflection data
+      await SessionService.updateSession(currentSession.id, {
+        status: "cancelled",
+        cancelled_reasons: selectedReasons.length > 0 ? selectedReasons : null,
+        cancelled_reason_details: null,
+        completed: false,
+      });
+
+      // Force sync to Supabase
+      await SessionService.syncToSupabase();
+
+      // Call the context's cancelSession to clean up UI state
+      cancelSession();
+      setCancelFlowStep(CancelFlowStep.NONE);
+      setSelectedReasons([]);
+    } catch (error) {
+      console.error("Error updating session with reflection:", error);
+      // Clean up UI state even if DB update fails
+      setCancelFlowStep(CancelFlowStep.NONE);
+      setSelectedReasons([]);
+    }
+  };
+
+  const handleSkipReflection = async () => {
+    if (!currentSession) return;
+
+    try {
+      // Get the current period and session from DB to check latest state
+      const currentPeriod = await SessionService.getCurrentPeriod();
+      const dbSession = await SessionService.getSession(currentSession.id);
+
+      // Check if session is already completed or cancelled
+      if (!currentPeriod || !dbSession) {
+        console.log("Session or period not found, already cleaned up");
+        setCancelFlowStep(CancelFlowStep.NONE);
+        setSelectedReasons([]);
+        return;
+      }
+
+      if (
+        dbSession.status === "completed" ||
+        dbSession.status === "cancelled"
+      ) {
+        console.log("Session already", dbSession.status);
+        setCancelFlowStep(CancelFlowStep.NONE);
+        setSelectedReasons([]);
+        return;
+      }
+
+      // Calculate actual duration up to now
+      const startTime = new Date(currentSession.startTime);
+      const endTime = new Date();
+      const actualSeconds = Math.floor(
+        (endTime.getTime() - startTime.getTime()) / 1000
+      );
+
+      // Update period with null reflection data
+      await SessionService.updatePeriod(currentPeriod.id, {
+        actual_duration_minutes: actualSeconds / 60,
+        ended_at: new Date().toISOString(),
+        completed: false,
+        distraction_reasons_selected: null,
+      });
+
+      // Update session with null reflection data
+      await SessionService.updateSession(currentSession.id, {
+        status: "cancelled",
+        cancelled_reasons: null,
+        cancelled_reason_details: "Skipped reflection",
+        completed: false,
+      });
+
+      // Force sync to Supabase
+      await SessionService.syncToSupabase();
+
+      // Call the context's cancelSession to clean up UI state
+      cancelSession();
+      setCancelFlowStep(CancelFlowStep.NONE);
+      setSelectedReasons([]);
+    } catch (error) {
+      console.error("Error updating session for skip reflection:", error);
+      // Clean up UI state even if DB update fails
+      setCancelFlowStep(CancelFlowStep.NONE);
+      setSelectedReasons([]);
+    }
+  };
+
+  const toggleReason = (reason: string) => {
+    setSelectedReasons((prev) =>
+      prev.includes(reason)
+        ? prev.filter((r) => r !== reason)
+        : [...prev, reason]
+    );
+  };
+
+  // Replace showCancelConfirmation modal with this
+  const renderCancelFlow = () => {
+    switch (cancelFlowStep) {
+      case CancelFlowStep.CONFIRM:
+        return (
+          <Modal
+            visible={true}
+            animationType="fade"
+            transparent={true}
+            onRequestClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
+          >
+            <View className="flex-1 bg-black/50 justify-center items-center">
+              <View className="bg-[#C2C1BB] rounded-3xl p-8 w-[95%] max-w-[500px] mx-4">
+                {/* Existing cancel confirmation content */}
+                <View className="flex-row items-start justify-between mb-8">
+                  <Text className="text-black text-base flex-1 mr-4">
+                    IF YOU FINISHED THE TASK, MARK IT AS COMPLETE:
+                  </Text>
+                  <TouchableOpacity
+                    className="w-8 h-8 rounded-full border-2 border-black items-center justify-center"
+                    onPress={() => setIsTaskComplete(!isTaskComplete)}
+                  >
+                    {isTaskComplete && (
+                      <FontAwesome name="check" size={16} color="#000" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                <Text className="text-4xl text-center mb-2">End session</Text>
+                <Text className="text-4xl italic text-center mb-12">
+                  early?
+                </Text>
+
+                <Text className="text-base uppercase text-center mb-2">
+                  INTENTION TO FINISH:
+                </Text>
+                <Text className="text-xl text-center mb-10">
+                  {currentSession?.taskDescription || "creating a landing page"}
+                </Text>
+
+                <Text className="text-lg text-center mb-8">
+                  This task isn't finished. Once you end it, you won't be able
+                  to resume or undo it.
+                </Text>
+
+                <Text className="text-lg text-center mb-12">
+                  Choose what feels right: stay focused, or reflect and close
+                  with intention.
+                </Text>
+
+                <TouchableOpacity
+                  className="bg-white py-5 rounded-2xl items-center mb-4"
+                  onPress={() => setCancelFlowStep(CancelFlowStep.NONE)}
+                >
+                  <Text className="text-black text-lg font-medium">
+                    GO BACK
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="bg-black py-5 rounded-2xl items-center"
+                  onPress={handleStartReflection}
+                >
+                  <Text className="text-white text-lg font-medium">
+                    END SESSION AND REFLECT
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        );
+
+      case CancelFlowStep.REFLECT:
+        return (
+          <Modal
+            visible={true}
+            animationType="fade"
+            transparent={true}
+            onRequestClose={() => setCancelFlowStep(CancelFlowStep.CONFIRM)}
+          >
+            <View className="flex-1 bg-black/50 justify-center items-center">
+              <View className="bg-[#C2C1BB] rounded-3xl p-8 w-[95%] max-w-[500px] mx-4">
+                <Text className="text-4xl text-center mb-2">Take a moment</Text>
+                <Text className="text-4xl italic text-center mb-12">
+                  to reflect:
+                </Text>
+
+                <Text className="text-base uppercase text-center mb-2">
+                  INTENTION TO FINISH:
+                </Text>
+                <Text className="text-xl text-center mb-10">
+                  {currentSession?.taskDescription}
+                </Text>
+
+                <Text className="text-lg text-center mb-8">
+                  You set a clear intention. Even if you didn't finish, it
+                  matters that you noticed.
+                </Text>
+
+                {/* Reason Buttons */}
+                {[
+                  "SOCIAL MEDIA / PHONE",
+                  "EXTERNAL DISTRACTIONS",
+                  "LOW ENERGY",
+                  "CHANGE IN PRIORITIES",
+                ].map((reason) => (
+                  <TouchableOpacity
+                    key={reason}
+                    className={`bg-white py-5 px-6 rounded-3xl items-center mb-4 shadow-sm flex-row justify-between
+                      ${
+                        selectedReasons.includes(reason)
+                          ? "border border-[#C2C1BB]"
+                          : ""
+                      }`}
+                    onPress={() => toggleReason(reason)}
+                  >
+                    <Text
+                      className="text-black text-lg"
+                      style={{ fontFamily: "System" }}
+                    >
+                      {reason}
+                    </Text>
+                    {selectedReasons.includes(reason) && (
+                      <View className="bg-[#C2C1BB] rounded-full p-1">
+                        <FontAwesome name="check" size={16} color="#fff" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))}
+
+                <TouchableOpacity
+                  className="bg-black py-5 rounded-3xl items-center mb-4"
+                  onPress={handleSubmitReflection}
+                >
+                  <Text className="text-white text-lg font-medium">
+                    SUBMIT & END SESSION
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  className="py-3 items-center"
+                  onPress={handleSkipReflection}
+                >
+                  <Text className="text-black text-base">
+                    SKIP & END SESSION
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Modal>
+        );
+
+      default:
+        return null;
+    }
   };
 
   // Get appropriate button text based on timer status
@@ -339,7 +646,9 @@ export default function TimerScreen() {
   const renderSessionDebug = () => {
     if (!__DEV__) return null;
     return <SessionDebugPanel />;
-  // Add this helper function near your other utility functions
+  };
+
+  // Helper function for formatting duration in export
   const formatDurationForExport = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -627,44 +936,8 @@ export default function TimerScreen() {
         </View>
       </Modal>
 
-      {/* Cancel Confirmation Modal */}
-      <Modal
-        visible={showCancelConfirmation}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowCancelConfirmation(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-center items-center">
-          <View className="bg-white rounded-xl p-5 w-[90%] max-w-[400px]">
-            <Text className="text-xl font-bold mb-4 text-center">
-              Cancel Session?
-            </Text>
-            <Text className="text-base text-gray-600 mb-6 text-center">
-              Are you sure you want to cancel your current focus session?
-            </Text>
-
-            <View className="flex-row justify-between">
-              <TouchableOpacity
-                className="flex-1 py-3 rounded-lg items-center mx-2 bg-gray-100"
-                onPress={() => setShowCancelConfirmation(false)}
-              >
-                <Text className="text-gray-800 text-base font-medium">
-                  No, Keep Going
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className="flex-1 py-3 rounded-lg items-center mx-2 bg-red-500"
-                onPress={confirmCancelSession}
-              >
-                <Text className="text-white text-base font-medium">
-                  Yes, Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Cancel Flow */}
+      {renderCancelFlow()}
 
       {/* Export Modal */}
       <ExportModal
