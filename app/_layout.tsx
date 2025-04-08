@@ -17,8 +17,13 @@ import {
   Figtree_400Regular,
   Figtree_500Medium,
 } from "@expo-google-fonts/figtree";
-import { LibreBaskerville_400Regular } from "@expo-google-fonts/libre-baskerville";
+import {
+  LibreBaskerville_400Regular,
+  LibreBaskerville_400Regular_Italic,
+} from "@expo-google-fonts/libre-baskerville";
+import { LibreCaslonText_400Regular } from "@expo-google-fonts/libre-caslon-text";
 import { ProjectProvider } from "@/contexts/ProjectContext";
+
 export {
   // Catch any errors thrown by the Layout component.
   ErrorBoundary,
@@ -37,6 +42,8 @@ export default function RootLayout() {
     Figtree_400Regular,
     Figtree_500Medium,
     LibreBaskerville_400Regular,
+    LibreBaskerville_400Regular_Italic,
+    LibreCaslonText_400Regular,
   });
 
   useEffect(() => {

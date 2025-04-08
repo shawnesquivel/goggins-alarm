@@ -59,6 +59,12 @@
         {
           "cameraPermission": "Allow Deep Work Timer to access your camera."
         }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Allow Deep Work Timer to save photos."
+        }
       ]
     ],
     "experiments": {

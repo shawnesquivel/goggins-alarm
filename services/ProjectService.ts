@@ -8,6 +8,7 @@ import { v4 as uuidv4 } from "uuid";
 const STORAGE_KEYS = {
   PROJECTS: "offline_projects",
   PENDING_OPS: "pending_projects_operations",
+  OFFLINE_MODE: "offline_mode",
 };
 
 // Define pending operation types
@@ -20,6 +21,25 @@ export interface PendingOperation {
 }
 
 export const ProjectService = {
+  isOfflineMode: false,
+
+  async setOfflineMode(enabled: boolean) {
+    this.isOfflineMode = enabled;
+    await AsyncStorage.setItem(STORAGE_KEYS.OFFLINE_MODE, JSON.stringify(enabled));
+    console.log(`Offline mode ${enabled ? 'enabled' : 'disabled'}`);
+  },
+
+  async checkOfflineMode() {
+    try {
+      const offlineMode = await AsyncStorage.getItem(STORAGE_KEYS.OFFLINE_MODE);
+      this.isOfflineMode = offlineMode === 'true';
+      return this.isOfflineMode;
+    } catch (error) {
+      console.error("Error checking offline mode:", error);
+      return false;
+    }
+  },
+
   /**
    * Local Storage Methods
    */
@@ -92,19 +112,22 @@ export const ProjectService = {
   async createProject(
     projectData: Omit<Project, "id" | "createdAt" | "updatedAt">
   ): Promise<Project> {
-    // Generate new project with UUID
     const newProject = {
       ...projectData,
-      id: this.generateUUID(), // Use UUID instead of timestamp
+      id: this.generateUUID(),
       createdAt: new Date(),
       updatedAt: new Date(),
     };
 
     // Save locally first
-    await this.saveLocalProjects([
-      ...(await this.getLocalProjects()),
-      newProject,
-    ]);
+    const localProjects = await this.getLocalProjects();
+    await this.saveLocalProjects([...localProjects, newProject]);
+
+    // If in offline mode, skip Supabase operations
+    if (this.isOfflineMode) {
+      console.log("Offline mode: Skipping Supabase sync for create");
+      return newProject;
+    }
 
     // Try to create in Supabase directly first
     try {
@@ -171,18 +194,23 @@ export const ProjectService = {
 
   // Update an existing project
   async updateProject(projectData: Project): Promise<Project> {
-    const updatedProject: Project = {
+    const updatedProject = {
       ...projectData,
       updatedAt: new Date(),
     };
 
-    // Update in local storage first
+    // Update in local storage
     const localProjects = await this.getLocalProjects();
     const updatedProjects = localProjects.map((project) =>
       project.id === updatedProject.id ? updatedProject : project
     );
-
     await this.saveLocalProjects(updatedProjects);
+
+    // If in offline mode, skip Supabase operations
+    if (this.isOfflineMode) {
+      console.log("Offline mode: Skipping Supabase sync for update");
+      return updatedProject;
+    }
 
     // Try to update in Supabase
     try {
@@ -327,6 +355,12 @@ export const ProjectService = {
   // Sync local projects with remote database
   async syncProjects(): Promise<Project[]> {
     try {
+      // Check offline mode first
+      if (this.isOfflineMode) {
+        console.log("Offline mode: Skipping sync with Supabase");
+        return await this.getLocalProjects();
+      }
+
       console.log(
         "Starting bidirectional project sync with timestamp resolution..."
       );
@@ -412,7 +446,9 @@ export const ProjectService = {
       return mergedProjects;
     } catch (error) {
       console.error("Project sync failed:", error);
-      return [];
+      // If sync fails, enable offline mode and return local projects
+      await this.setOfflineMode(true);
+      return await this.getLocalProjects();
     }
   },
 
