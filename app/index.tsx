@@ -38,8 +38,9 @@ export default function InitialRouteScreen() {
   }
 
   // Only check auth if onboarding is complete
+  // Allow unauthenticated users to access the app after skipping onboarding
   if (!session) {
-    return <Redirect href="/login" />;
+    return <Redirect href="/(tabs)" />;
   }
 
   return <Redirect href="/(tabs)" />;

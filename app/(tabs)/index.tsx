@@ -310,7 +310,7 @@ export default function TimerScreen() {
       contentContainerStyle={{ padding: 20 }}
     >
       {/* Auth Debug Panel (only in development mode) */}
-      {/* {__DEV__ && renderAuthDebug()} */}
+      {__DEV__ && renderAuthDebug()}
 
       {/* Timer Display */}
       <View className="items-center py-10">
