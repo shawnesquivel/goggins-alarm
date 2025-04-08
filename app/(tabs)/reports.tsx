@@ -248,7 +248,7 @@ export default function ReportsScreen() {
                     </Text>
                     {session.rating && (
                       <Text style={styles.sessionRating}>
-                        {session.rating === "happy" ? "😊" : "😞"}
+                        {session.rating >= 3 ? "😊" : "😞"}
                       </Text>
                     )}
                   </View>

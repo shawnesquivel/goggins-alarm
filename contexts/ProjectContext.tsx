@@ -6,6 +6,8 @@ interface ProjectContextType {
   projects: Project[];
   loading: boolean;
   error: string | null;
+  pendingOps: any[];
+  errorCount: number;
   loadProjects: () => Promise<void>;
   addProject: (
     projectData: Omit<Project, "id" | "createdAt" | "updatedAt">
@@ -13,6 +15,7 @@ interface ProjectContextType {
   updateProject: (project: Project) => Promise<Project>;
   deleteProject: (id: string) => Promise<boolean>;
   syncProjects: () => Promise<void>;
+  clearPendingOperations: () => Promise<void>;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -21,6 +24,8 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pendingOps, setPendingOps] = useState<any[]>([]);
+  const [errorCount, setErrorCount] = useState(0);
 
   const loadProjects = async () => {
     try {
@@ -90,6 +95,21 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const clearPendingOperations = async () => {
+    try {
+      const cleanedOps = await ProjectService.cleanupPendingOperations();
+      setPendingOps(cleanedOps);
+      // Count potential duplicates (insert operations)
+      const insertOps = cleanedOps.filter((op) => op.type === "insert");
+      setErrorCount(insertOps.length);
+      return cleanedOps;
+    } catch (err) {
+      setError("Failed to clear pending operations");
+      console.error(err);
+      throw err;
+    }
+  };
+
   // Initialize projects
   useEffect(() => {
     loadProjects();
@@ -99,6 +119,25 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
 
     // Sync on initial load
     syncProjects();
+  }, []);
+
+  // Add this effect to load pending operations periodically
+  useEffect(() => {
+    const loadPendingOps = async () => {
+      try {
+        const ops = await ProjectService.getPendingOperations();
+        setPendingOps(ops);
+        // Count potential duplicates
+        const insertOps = ops.filter((op) => op.type === "insert");
+        setErrorCount(insertOps.length);
+      } catch (err) {
+        console.error("Error loading pending operations:", err);
+      }
+    };
+
+    loadPendingOps();
+    const interval = setInterval(loadPendingOps, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -112,6 +151,9 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         updateProject,
         deleteProject,
         syncProjects,
+        pendingOps,
+        errorCount,
+        clearPendingOperations,
       }}
     >
       {children}

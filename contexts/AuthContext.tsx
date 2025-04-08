@@ -1,8 +1,7 @@
 import React, { createContext, useState, useEffect, useContext } from "react";
 import { Session } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { supabase, cleanupAppStateListener } from "../lib/supabase";
 import { Platform } from "react-native";
-import { useRouter } from "expo-router";
 
 type AuthContextType = {
   session: Session | null;
@@ -94,8 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
-      console.log("Cleaning up auth subscription");
       subscription.unsubscribe();
+      cleanupAppStateListener();
     };
   }, []);
 
