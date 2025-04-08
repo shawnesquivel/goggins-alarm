@@ -249,13 +249,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     customDuration?: number,
     customBreakDuration?: number
   ) => {
-    console.log("AlarmContext: Starting focus session", {
-      taskDescription,
-      projectId,
-      customDuration,
-      customBreakDuration,
-    });
-
     // Reset all session state
     isOvertimeRef.current = false;
     setIsOvertime(false);
@@ -299,8 +292,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         planned_duration_minutes: duration,
         started_at: new Date().toISOString(),
       });
-
-      console.log("AlarmContext: Created work period in DB");
     } catch (error) {
       console.error(
         "AlarmContext: Error creating session/period in DB:",
