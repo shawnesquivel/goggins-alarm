@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -39,6 +39,7 @@ import Reanimated, {
   withSpring,
 } from "react-native-reanimated";
 import { useOnboarding } from "@/contexts/OnboardingContext";
+import { checkConnection } from "@/lib/supabase";
 
 // Create animated components once outside of the render functions
 const AnimatedText = Reanimated.createAnimatedComponent(Text);
@@ -366,6 +367,9 @@ export default function OnboardingScreen({
   children,
   disableNext,
 }: OnboardingScreenProps) {
+  const [isConnected, setIsConnected] = useState(true);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryMessage, setRetryMessage] = useState<string | null>(null);
   const showBackButton = currentStep > 0 && onBack;
   const { progress, previousProgress, updateProgress, completeOnboarding } =
     useOnboarding();
@@ -387,6 +391,26 @@ export default function OnboardingScreen({
     updateProgress(newProgress);
   }, [currentStep, totalSteps]);
 
+  useEffect(() => {
+    const checkConnectionStatus = async () => {
+      try {
+        const connected = await checkConnection();
+        setIsConnected(connected);
+        if (!connected) {
+          setRetryMessage(
+            "Unable to connect to the server. Please check your internet connection."
+          );
+        }
+      } catch (error) {
+        console.log("Connection check failed:", error);
+        setIsConnected(false);
+        setRetryMessage("Connection check failed. Please try again.");
+      }
+    };
+
+    checkConnectionStatus();
+  }, []);
+
   const progressBarStyle = useAnimatedStyle(() => ({
     width: `${progressValue.value}%`,
   }));
@@ -395,10 +419,78 @@ export default function OnboardingScreen({
     Keyboard.dismiss();
   };
 
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    setRetryMessage("Attempting to connect...");
+
+    try {
+      const connected = await checkConnection();
+      setIsConnected(connected);
+      if (!connected) {
+        setRetryMessage(
+          "Still unable to connect. Please check your internet connection."
+        );
+      }
+    } catch (error: any) {
+      console.log("Retry failed:", error);
+      const errorMessage = error?.message || "Unknown error occurred";
+      setRetryMessage(
+        __DEV__
+          ? `Connection Error: ${errorMessage}\nMake sure Supabase is running locally with 'npx supabase start'`
+          : "Connection attempt failed. Please try again."
+      );
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
+  if (!isConnected) {
+    return (
+      <SafeAreaView className="flex-1 bg-[#F3F1EC] justify-center items-center px-6">
+        <View className="items-center">
+          <Text className="text-2xl font-medium text-center mb-4">
+            Connection Required
+          </Text>
+          <Text className="text-base text-center text-[#555] mb-8">
+            {retryMessage ||
+              "Please check your internet connection to continue setting up your account."}
+          </Text>
+          {__DEV__ && retryMessage && (
+            <View className="bg-red-50 p-4 rounded-md mb-4 w-full">
+              <Text className="text-xs text-red-500 font-mono">
+                Development Mode: {retryMessage}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity
+            onPress={handleRetry}
+            disabled={isRetrying}
+            className={`bg-black py-4 px-8 rounded-md ${
+              isRetrying ? "opacity-50" : ""
+            }`}
+          >
+            <Text className="text-white text-base font-medium">
+              {isRetrying ? "Connecting..." : "Retry Connection"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <TouchableWithoutFeedback onPress={dismissKeyboard}>
       <SafeAreaView className="flex-1 bg-[#F3F1EC]">
         <StatusBar barStyle="dark-content" />
+
+        {/* Offline Indicator */}
+        {!isConnected && (
+          <View className="bg-[#FFE4E1] py-2 px-4">
+            <Text className="text-[#DC143C] text-sm text-center font-medium">
+              Offline Mode - Some features may be limited
+            </Text>
+          </View>
+        )}
 
         {/* Header - version info and skip button */}
         <View className="px-4 pt-2 flex-row justify-between items-center">

@@ -265,8 +265,6 @@ export const SessionService: SessionServiceInterface = {
         period.type === periodType &&
         !period.completed
       ) {
-        // Mark as completed with actual duration being planned duration
-        period.completed = true;
         period.ended_at = new Date().toISOString();
         period.actual_duration_minutes = period.planned_duration_minutes;
         period.last_updated_at = new Date().toISOString();

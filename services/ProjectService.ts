@@ -444,7 +444,7 @@ export const ProjectService = {
       console.log(`Synced and merged ${mergedProjects.length} projects`);
       return mergedProjects;
     } catch (error) {
-      console.error("Project sync failed:", error);
+      console.warn("Project sync failed:", error);
       // If sync fails, enable offline mode and return local projects
       await this.setOfflineMode(true);
       return await this.getLocalProjects();

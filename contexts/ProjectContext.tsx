@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Project } from "@/types/project";
 import { ProjectService } from "@/services/ProjectService";
-import { supabase } from "@/lib/supabase";
+import { checkConnection } from "@/lib/supabase";
 
 interface ProjectContextType {
   projects: Project[];
@@ -25,10 +25,11 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const initializeOfflineMode = async () => {
       try {
-        // Try to connect to Supabase
-        const { data, error } = await supabase.from("projects").select("count");
-        if (error) {
-          console.log("Supabase connection failed, enabling offline mode");
+        const isConnected = await checkConnection();
+        if (!isConnected) {
+          console.log(
+            "Supabase: Failed to connect to Supabase, enabling offline mode"
+          );
           await ProjectService.setOfflineMode(true);
         }
       } catch (error) {
