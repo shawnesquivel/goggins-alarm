@@ -378,7 +378,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       const periodUpdate = {
         actual_duration_minutes: actualSeconds / 60,
         ended_at: endTime.toISOString(),
-        completed: true,
       };
 
       if (currentSession.type === "focus") {
@@ -397,11 +396,16 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       await SessionService.updatePeriod(currentPeriod.id, periodUpdate);
 
       // Update session
-      await SessionService.updateSession(currentSession.id, {
-        status: "completed",
-        completed: true,
-        user_notes: notes || null,
-      });
+      if (!transitionToBreak) {
+        await SessionService.updateSession(currentSession.id, {
+          status: "completed",
+          user_notes: notes || null,
+        });
+
+        // Only clear the current session if not transitioning to break
+        setCurrentSession(null);
+        await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+      }
 
       console.log("AlarmContext: Updated session status to completed");
 
@@ -417,9 +421,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     const completedSession = currentSession;
 
     // UI state updates
-    setCurrentSession(null);
     setTimerStatus(TimerStatus.IDLE);
-    await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
 
     // Clear current period in SessionService
     await SessionService.setCurrentPeriod(null);
@@ -434,21 +436,24 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   const startBreakSession = async () => {
     if (currentSession && currentSession.type === "break") return;
 
-    // Reset all session state
+    // Reset state
     isOvertimeRef.current = false;
     setIsOvertime(false);
     setNextBreakDuration(null);
 
-    // Clear any existing period/session first to avoid duplicates
+    // Clear any existing period first to avoid duplicates
     await SessionService.setCurrentPeriod(null);
 
     // Use custom break duration if set, otherwise use from settings
     const breakDuration =
       nextBreakDuration !== null ? nextBreakDuration : settings.breakDuration;
 
-    // Create new break session
+    // Use existing session ID if available
+    const sessionId = currentSession?.id || uuidv4();
+
+    // Create a representation of break period for UI state
     const newSession: PomodoroSession = {
-      id: uuidv4(),
+      id: sessionId, // Reuse session ID
       taskDescription: "Break",
       projectId: currentSession?.projectId || "break",
       startTime: new Date(),
@@ -459,35 +464,33 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     };
 
     try {
-      // Create new break session in DB or update existing session
-      // For simplicity in MVP, we'll create a new session for breaks too
-      await SessionService.createSession({
-        id: newSession.id,
-        task: "Break",
-        project_id: newSession.projectId,
-        status: "in_progress",
-      });
+      // Only create a new session if we don't have a current one
+      if (!currentSession) {
+        await SessionService.createSession({
+          id: sessionId,
+          task: "Break",
+          project_id: newSession.projectId,
+          status: "in_progress",
+        });
+      }
 
-      console.log("AlarmContext: Created break session in DB", newSession.id);
-
-      // Create rest period
+      // Create rest period linked to the session
       await SessionService.createPeriod({
-        session_id: newSession.id,
+        session_id: sessionId,
         type: "rest",
         planned_duration_minutes: breakDuration,
         started_at: new Date().toISOString(),
       });
-
-      console.log("AlarmContext: Created rest period in DB");
     } catch (error) {
-      console.error("AlarmContext: Error creating break session in DB:", error);
+      console.error("Error creating break period:", error);
     }
 
+    // Update UI state
     setCurrentSession(newSession);
     setRemainingSeconds(breakDuration * 60);
     setTimerStatus(TimerStatus.RUNNING);
 
-    // Save current session
+    // Save current session state
     AsyncStorage.setItem(
       STORAGE_KEYS.CURRENT_SESSION,
       JSON.stringify(newSession)
