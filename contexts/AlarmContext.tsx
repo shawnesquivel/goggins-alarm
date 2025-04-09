@@ -51,11 +51,6 @@ interface PomodoroContextType {
   startBreakSession: () => void;
   cancelSession: () => void;
 
-  // Tags
-  tags: Tag[];
-  addTag: (tag: Omit<Tag, "id">) => void;
-  deleteTag: (id: string) => void;
-
   // Settings
   settings: TimerSettings;
   updateSettings: (settings: TimerSettings) => void;
@@ -66,6 +61,17 @@ interface PomodoroContextType {
   getProjectStats: (
     projectId: string
   ) => Promise<{ totalSessions: number; totalMinutes: number }>;
+
+  // New more specific functions
+  completeWorkPeriod: (
+    rating?: number,
+    notes?: string,
+    startBreak?: boolean
+  ) => Promise<void>;
+  completeRestPeriod: (
+    activities?: string[],
+    startNewWork?: boolean
+  ) => Promise<void>;
 }
 
 // Default settings
@@ -76,24 +82,12 @@ const DEFAULT_SETTINGS: TimerSettings = {
   notificationsEnabled: true,
 };
 
-// Default tags
-const DEFAULT_TAGS: Tag[] = [
-  { id: "1", name: "Coding", color: "#4A90E2" },
-  { id: "2", name: "Planning", color: "#7ED321" },
-  { id: "3", name: "Marketing", color: "#F5A623" },
-  { id: "4", name: "Meeting", color: "#D0021B" },
-  { id: "5", name: "Education", color: "#9013FE" },
-  { id: "6", name: "Design", color: "#50E3C2" },
-  { id: "7", name: "Sales", color: "#BD10E0" },
-];
-
 const PomodoroContext = createContext<PomodoroContextType | undefined>(
   undefined
 );
 
 export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   // State
-  const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
   const [settings, setSettings] = useState<TimerSettings>(DEFAULT_SETTINGS);
   const [currentSession, setCurrentSession] = useState<PomodoroSession | null>(
     null
@@ -114,18 +108,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadSavedData = async () => {
       try {
-        // Load tags
-        const savedTags = await AsyncStorage.getItem(STORAGE_KEYS.TAGS);
-        if (savedTags) {
-          setTags(JSON.parse(savedTags));
-        } else {
-          // Save default tags if none exist
-          await AsyncStorage.setItem(
-            STORAGE_KEYS.TAGS,
-            JSON.stringify(DEFAULT_TAGS)
-          );
-        }
-
         // Load settings
         const savedSettings = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
         if (savedSettings) {
@@ -333,6 +315,109 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     // Future enhancement could be to track pause durations
   };
 
+  const completeWorkPeriod = async (
+    rating?: number,
+    notes?: string,
+    startBreak: boolean = false
+  ) => {
+    if (!currentSession || currentSession.type !== "focus") return;
+
+    stopTimer();
+    const currentPeriod = await SessionService.getCurrentPeriod();
+    if (!currentPeriod) {
+      console.warn("No current period found for work completion");
+      return;
+    }
+
+    // Calculate duration
+    const startTime = new Date(currentSession.startTime);
+    const endTime = new Date();
+    const actualSeconds = Math.floor(
+      (endTime.getTime() - startTime.getTime()) / 1000
+    );
+
+    // Update work period
+    await SessionService.updatePeriod(currentPeriod.id, {
+      actual_duration_minutes: actualSeconds / 60,
+      ended_at: endTime.toISOString(),
+      quality_rating: rating || null,
+      user_notes: notes || null,
+    });
+
+    // Only complete session if not transitioning to break
+    if (!startBreak) {
+      await SessionService.updateSession(currentSession.id, {
+        status: "completed",
+        user_notes: notes || null,
+      });
+
+      // Clean up UI state
+      setCurrentSession(null);
+      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    }
+
+    // UI state update
+    setTimerStatus(TimerStatus.IDLE);
+
+    // Only clear current period if not transitioning to break
+    if (!startBreak) {
+      await SessionService.setCurrentPeriod(null);
+    }
+
+    // Force sync to Supabase
+    await SessionService.syncToSupabase();
+
+    // Start break if requested
+    if (startBreak) {
+      await startBreakSession();
+    }
+  };
+
+  const completeRestPeriod = async (
+    activities?: string[],
+    startNewWork: boolean = false
+  ) => {
+    if (!currentSession || currentSession.type !== "break") return;
+
+    stopTimer();
+    const currentPeriod = await SessionService.getCurrentPeriod();
+    if (!currentPeriod) {
+      console.warn("No current period found for rest completion");
+      return;
+    }
+
+    // Calculate duration
+    const startTime = new Date(currentSession.startTime);
+    const endTime = new Date();
+    const actualSeconds = Math.floor(
+      (endTime.getTime() - startTime.getTime()) / 1000
+    );
+
+    // Update rest period
+    await SessionService.updatePeriod(currentPeriod.id, {
+      actual_duration_minutes: actualSeconds / 60,
+      ended_at: endTime.toISOString(),
+      rest_activities_selected: activities || null,
+    });
+
+    // Always mark session as completed after rest
+    await SessionService.updateSession(currentSession.id, {
+      status: "completed",
+    });
+
+    // Clean up UI state
+    setCurrentSession(null);
+    await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    setTimerStatus(TimerStatus.IDLE);
+    await SessionService.setCurrentPeriod(null);
+
+    // Force sync to Supabase
+    await SessionService.syncToSupabase();
+
+    // Starting new work session is handled by UI
+  };
+
+  // Keep for backward compatibility, but simplified
   const completeSession = async (
     rating?: number,
     notes?: string,
@@ -340,87 +425,11 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     breakActivities?: string[]
   ) => {
     if (!currentSession) return;
-    const currentPeriod = await SessionService.getCurrentPeriod();
 
-    stopTimer();
-
-    // Get the current period from SessionService
-
-    if (currentPeriod) {
-      console.log("AlarmContext: Found current period", currentPeriod.id);
-
-      // Calculate actual duration including overtime
-      const startTime = new Date(currentSession.startTime);
-      const endTime = new Date();
-      const actualSeconds = Math.floor(
-        (endTime.getTime() - startTime.getTime()) / 1000
-      );
-      const plannedSeconds = currentSession.duration * 60;
-
-      console.log("AlarmContext: Duration calculation", {
-        planned: plannedSeconds,
-        actual: actualSeconds,
-        overtime: actualSeconds - plannedSeconds,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        isOvertime: isOvertimeRef.current,
-      });
-
-      // Complete the period with different fields based on session type
-      const periodUpdate = {
-        actual_duration_minutes: actualSeconds / 60,
-        ended_at: endTime.toISOString(),
-      };
-
-      if (currentSession.type === "focus") {
-        // For focus sessions, include rating and notes
-        Object.assign(periodUpdate, {
-          quality_rating: rating || null,
-          user_notes: notes || null,
-        });
-      } else if (currentSession.type === "break") {
-        // For break sessions, include activities
-        Object.assign(periodUpdate, {
-          rest_activities_selected: breakActivities || null,
-        });
-      }
-
-      await SessionService.updatePeriod(currentPeriod.id, periodUpdate);
-
-      // Update session
-      if (!transitionToBreak) {
-        await SessionService.updateSession(currentSession.id, {
-          status: "completed",
-          user_notes: notes || null,
-        });
-
-        // Only clear the current session if not transitioning to break
-        setCurrentSession(null);
-        await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
-      }
-
-      console.log("AlarmContext: Updated session status to completed");
-
-      // Force sync to Supabase
-      await SessionService.syncToSupabase();
-    } else {
-      console.warn(
-        "AlarmContext: Could not complete session, no 'period (work/rest)' found."
-      );
-    }
-
-    // UI state updates
-    setTimerStatus(TimerStatus.IDLE);
-
-    // IMPORTANT: Only clear current period if NOT transitioning to break with activities
-    if (!transitionToBreak || currentSession.type === "break") {
-      await SessionService.setCurrentPeriod(null); // clear
-    }
-
-    // If we're transitioning to a break session, start it now
-    if (transitionToBreak) {
-      console.log("AlarmContext: Transitioning to break session");
-      await startBreakSession();
+    if (currentSession.type === "focus") {
+      await completeWorkPeriod(rating, notes, transitionToBreak);
+    } else if (currentSession.type === "break") {
+      await completeRestPeriod(breakActivities);
     }
   };
 
@@ -429,7 +438,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     if (
       currentPeriod &&
       currentPeriod.type === "rest" &&
-      !currentPeriod.completed &&
       currentSession?.id === currentPeriod.session_id
     ) {
       console.log("[AlarmContext]: Rest period already exists, skipping");
@@ -489,28 +497,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     // Start timer
     startTimer();
-  };
-
-  // Tag management
-  const addTag = async (tagData: Omit<Tag, "id">) => {
-    const newTag: Tag = {
-      ...tagData,
-      id: Date.now().toString(),
-    };
-
-    const updatedTags = [...tags, newTag];
-    setTags(updatedTags);
-
-    // Save to storage
-    await AsyncStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(updatedTags));
-  };
-
-  const deleteTag = async (id: string) => {
-    const updatedTags = tags.filter((tag) => tag.id !== id);
-    setTags(updatedTags);
-
-    // Save to storage
-    await AsyncStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(updatedTags));
   };
 
   // Settings management
@@ -625,11 +611,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         startBreakSession,
         cancelSession: handleCancelSession,
 
-        // Tags
-        tags,
-        addTag,
-        deleteTag,
-
         // Settings
         settings,
         updateSettings,
@@ -638,6 +619,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         getSessionHistory,
         getTotalFocusTime,
         getProjectStats,
+
+        // New more specific functions
+        completeWorkPeriod,
+        completeRestPeriod,
       }}
     >
       {children}

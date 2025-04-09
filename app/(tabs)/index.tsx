@@ -34,7 +34,8 @@ export default function TimerScreen() {
     currentSession,
     pauseSession,
     resumeSession,
-    completeSession,
+    completeWorkPeriod,
+    completeRestPeriod,
     startBreakSession,
     settings,
     isOvertime,
@@ -92,12 +93,35 @@ export default function TimerScreen() {
     return `${isOvertime ? "+" : ""}${timeString}`;
   };
 
-  // Handle session completion and rating
-  const handleCompleteSession = () => {
-    completeSession(starRating, sessionNotes, true, selectedBreakActivities);
+  // Update the handler for work session completion
+  const handleCompleteWorkSession = () => {
+    completeWorkPeriod(starRating, sessionNotes, true);
     setShowRatingModal(false);
     setSessionNotes("");
     setStarRating(0);
+  };
+
+  // End work session without break
+  const handleEndWorkSession = () => {
+    completeWorkPeriod(starRating, sessionNotes, false);
+    setShowRatingModal(false);
+    setSessionNotes("");
+    setStarRating(0);
+  };
+
+  // Update the handler for break session completion
+  const handleCompleteBreakSession = () => {
+    completeRestPeriod(selectedRestActivities, false);
+    setShowBreakRatingModal(false);
+    setSelectedRestActivities([]);
+  };
+
+  // Start new work after break
+  const handleStartNewWorkAfterBreak = () => {
+    completeRestPeriod(selectedRestActivities, true);
+    setShowBreakRatingModal(false);
+    setSelectedRestActivities([]);
+    setShowStartModal(true);
   };
 
   // Toggle selected activity
@@ -109,18 +133,6 @@ export default function TimerScreen() {
     } else {
       setSelectedRestActivities([...selectedRestActivities, activity]);
     }
-  };
-
-  // Updated handler for break session completion
-  const handleCompleteBreakSession = () => {
-    completeSession(
-      undefined, // No rating for breaks
-      undefined, // No notes needed since we have activities
-      false, // Don't transition to break
-      selectedRestActivities // Pass the selected activities
-    );
-    setShowBreakRatingModal(false);
-    setSelectedRestActivities([]);
   };
 
   // Handle timer controls
@@ -214,17 +226,24 @@ export default function TimerScreen() {
       await SessionService.updatePeriod(currentPeriod.id, {
         actual_duration_minutes: actualSeconds / 60,
         ended_at: new Date().toISOString(),
-        completed: false,
-        distraction_reasons_selected:
-          selectedReasons.length > 0 ? selectedReasons : null,
+        distraction_reasons_selected: isTaskComplete
+          ? null
+          : selectedReasons.length > 0
+          ? selectedReasons
+          : null,
+        completed: isTaskComplete,
       });
 
       // Update session with reflection data
       await SessionService.updateSession(currentSession.id, {
-        status: "cancelled",
-        cancelled_reasons: selectedReasons.length > 0 ? selectedReasons : null,
+        status: isTaskComplete ? "completed" : "cancelled",
+        completed: isTaskComplete,
+        cancelled_reasons: isTaskComplete
+          ? null
+          : selectedReasons.length > 0
+          ? selectedReasons
+          : null,
         cancelled_reason_details: null,
-        completed: false,
       });
 
       // Force sync to Supabase
@@ -279,7 +298,6 @@ export default function TimerScreen() {
       await SessionService.updatePeriod(currentPeriod.id, {
         actual_duration_minutes: actualSeconds / 60,
         ended_at: new Date().toISOString(),
-        completed: false,
         distraction_reasons_selected: null,
       });
 
@@ -288,7 +306,6 @@ export default function TimerScreen() {
         status: "cancelled",
         cancelled_reasons: null,
         cancelled_reason_details: "Skipped reflection",
-        completed: false,
       });
 
       // Force sync to Supabase
@@ -839,10 +856,7 @@ export default function TimerScreen() {
 
             <TouchableOpacity
               className="bg-black py-4 rounded-lg items-center mb-3"
-              onPress={() => {
-                handleCompleteSession();
-                startBreakSession();
-              }}
+              onPress={handleCompleteWorkSession}
             >
               <Text className="text-white text-base font-medium">
                 START DEEP REST
@@ -851,9 +865,7 @@ export default function TimerScreen() {
 
             <TouchableOpacity
               className="py-3 rounded-lg items-center"
-              onPress={() => {
-                handleCompleteSession();
-              }}
+              onPress={handleEndWorkSession}
             >
               <Text className="text-gray-800 text-base">END WORK SESSION</Text>
             </TouchableOpacity>
@@ -913,11 +925,7 @@ export default function TimerScreen() {
 
             <TouchableOpacity
               className="bg-black py-4 rounded-lg items-center mt-4 mb-3"
-              onPress={() => {
-                handleCompleteBreakSession();
-                // Start another focus session
-                setShowStartModal(true);
-              }}
+              onPress={handleStartNewWorkAfterBreak}
             >
               <Text className="text-white text-base font-medium">
                 START DEEP WORK
@@ -926,9 +934,7 @@ export default function TimerScreen() {
 
             <TouchableOpacity
               className="py-3 rounded-lg items-center"
-              onPress={() => {
-                handleCompleteBreakSession();
-              }}
+              onPress={handleCompleteBreakSession}
             >
               <Text className="text-gray-800 text-base">END WORK SESSION</Text>
             </TouchableOpacity>
