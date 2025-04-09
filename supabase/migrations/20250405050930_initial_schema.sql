@@ -39,7 +39,9 @@ CREATE TABLE IF NOT EXISTS public.sessions (
   status TEXT CHECK (status IN ('not_started', 'in_progress', 'completed', 'cancelled')) DEFAULT 'not_started',
   cancelled_reason TEXT, -- Only if cancelled
   completed BOOLEAN DEFAULT false, -- Ref: 1.6.7.3 - Track completion status
-  user_notes TEXT -- Ref: 1.6.8.2 - Optional notes for the entire session
+  user_notes TEXT, -- Ref: 1.6.8.2 - Optional notes for the entire session
+  distraction_reasons_selected TEXT[], -- Ref: 1.6.1.3.1.2 - Reasons for ending early
+  cancelled_reasons TEXT[] -- Ref: 1.6.1.3.1.2 - Reasons for cancellation
 );
 
 -- Unified periods table for both work and rest
@@ -53,7 +55,6 @@ CREATE TABLE IF NOT EXISTS public.periods (
   started_at TIMESTAMP WITH TIME ZONE,
   ended_at TIMESTAMP WITH TIME ZONE,
   quality_rating INTEGER CHECK (quality_rating IS NULL OR (quality_rating BETWEEN 1 AND 5)), -- Ref: 1.6.1.3.2.1
-  distraction_reasons_selected TEXT[], -- Ref: 1.6.1.3.1.2 - Reasons for ending early
   rest_activities_selected TEXT[], -- Ref: 1.6.3.2 - Activities during rest
   user_notes TEXT, -- Ref: 1.6.3.4 - Notes about distractions or rest activities
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),

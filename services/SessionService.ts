@@ -89,6 +89,7 @@ export const SessionService: SessionServiceInterface = {
       data: {
         id: sessionId,
         ...sessionData,
+        distraction_reasons_selected: sessionData.distraction_reasons_selected,
         last_updated_at: updatedSession.last_updated_at,
       },
       timestamp: Date.now(),
@@ -139,7 +140,6 @@ export const SessionService: SessionServiceInterface = {
       actual_duration_minutes: null,
       ended_at: null,
       quality_rating: null,
-      distraction_reasons_selected: null,
       rest_activities_selected: null,
       user_notes: null,
     } as DbPeriod;

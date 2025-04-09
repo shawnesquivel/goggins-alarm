@@ -1,6 +1,5 @@
 -- Add new columns
 ALTER TABLE sessions 
-ADD COLUMN cancelled_reasons text[] NULL,
 ADD COLUMN cancelled_reason_details text NULL;
 
 -- Migrate existing data from old column and then drop it
