@@ -263,7 +263,8 @@ export const SessionService: SessionServiceInterface = {
       if (
         period.session_id === sessionId &&
         period.type === periodType &&
-        !period.completed
+        !period.completed &&
+        !period.ended_at
       ) {
         period.ended_at = new Date().toISOString();
         period.actual_duration_minutes = period.planned_duration_minutes;

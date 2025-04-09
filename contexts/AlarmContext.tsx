@@ -339,20 +339,12 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     transitionToBreak: boolean = false,
     breakActivities?: string[]
   ) => {
-    console.log("AlarmContext: Completing session", {
-      sessionId: currentSession?.id,
-      rating,
-      notesLength: notes?.length || 0,
-      transitionToBreak,
-      breakActivities,
-    });
-
     if (!currentSession) return;
+    const currentPeriod = await SessionService.getCurrentPeriod();
 
     stopTimer();
 
     // Get the current period from SessionService
-    const currentPeriod = await SessionService.getCurrentPeriod();
 
     if (currentPeriod) {
       console.log("AlarmContext: Found current period", currentPeriod.id);
@@ -413,18 +405,17 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       await SessionService.syncToSupabase();
     } else {
       console.warn(
-        "AlarmContext: No current period found when completing session"
+        "AlarmContext: Could not complete session, no 'period (work/rest)' found."
       );
     }
-
-    // Store the current session data before clearing it
-    const completedSession = currentSession;
 
     // UI state updates
     setTimerStatus(TimerStatus.IDLE);
 
-    // Clear current period in SessionService
-    await SessionService.setCurrentPeriod(null);
+    // IMPORTANT: Only clear current period if NOT transitioning to break with activities
+    if (!transitionToBreak || currentSession.type === "break") {
+      await SessionService.setCurrentPeriod(null); // clear
+    }
 
     // If we're transitioning to a break session, start it now
     if (transitionToBreak) {
@@ -434,6 +425,17 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   };
 
   const startBreakSession = async () => {
+    const currentPeriod = await SessionService.getCurrentPeriod();
+    if (
+      currentPeriod &&
+      currentPeriod.type === "rest" &&
+      !currentPeriod.completed &&
+      currentSession?.id === currentPeriod.session_id
+    ) {
+      console.log("[AlarmContext]: Rest period already exists, skipping");
+      return;
+    }
+
     if (currentSession && currentSession.type === "break") return;
 
     // Reset state
@@ -464,17 +466,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     };
 
     try {
-      // Only create a new session if we don't have a current one
-      if (!currentSession) {
-        await SessionService.createSession({
-          id: sessionId,
-          task: "Break",
-          project_id: newSession.projectId,
-          status: "in_progress",
-        });
-      }
-
-      // Create rest period linked to the session
       await SessionService.createPeriod({
         session_id: sessionId,
         type: "rest",
