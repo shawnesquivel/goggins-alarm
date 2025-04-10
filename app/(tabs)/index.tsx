@@ -23,6 +23,7 @@ import { format } from "date-fns";
 import { ExportModal } from "@/components/shared/modals/ExportModal";
 import { HeaderRight } from "@/components/shared/HeaderRight";
 import { SessionService } from "@/services/SessionService";
+import { useAnalytics } from "@/app/hooks/useAnalytics";
 
 export default function TimerScreen() {
   const router = useRouter();
@@ -74,6 +75,7 @@ export default function TimerScreen() {
     CancelFlowStep.NONE
   );
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
+  const { analytics, isAnalyticsLoading, handleRefresh } = useAnalytics();
 
   // Add effect to calculate session times when reaching SESSION_COMPLETE step
   useEffect(() => {
@@ -99,6 +101,12 @@ export default function TimerScreen() {
 
     calculateTimes();
   }, [cancelFlowStep, currentSession?.id]);
+
+  useEffect(() => {
+    if (currentSession) {
+      handleRefresh();
+    }
+  }, [currentSession]);
 
   // Add export ref
   const exportRef = useRef({
@@ -1106,14 +1114,16 @@ export default function TimerScreen() {
       {/* Session Debug Panel (only in development mode) */}
       {/* {__DEV__ && renderSessionDebug()} */}
 
-      {/* Overview PlaceHolders */}
+      {/* Overview Section */}
       {!currentSession && (
         <View className="w-full bg-white rounded-lg mb-4">
           <View className="px-4 py-3">
             <Text className="text-sm text-gray-600 mb-1">
               WELCOME BACK SHAY,
             </Text>
-            <Text className="text-2xl font-medium mb-4">Wed, Apr 2</Text>
+            <Text className="text-2xl font-medium mb-4">
+              {format(new Date(), "EEE, MMM d")}
+            </Text>
 
             <View className="flex-row justify-between mb-4">
               <Text className="text-sm font-medium">OVERVIEW</Text>
@@ -1121,32 +1131,80 @@ export default function TimerScreen() {
             </View>
 
             <View className="items-center mb-6">
-              <View className="w-32 h-32 bg-gray-100 rounded-full mb-4" />
+              {/* Circle progress indicator - just showing % for MVP */}
+              <View className="w-32 h-32 bg-gray-100 rounded-full mb-4 items-center justify-center">
+                <Text className="text-xl font-bold">
+                  {isAnalyticsLoading
+                    ? "..."
+                    : `${analytics.goalProgressPercentage}%`}
+                </Text>
+              </View>
               <Text className="text-sm text-gray-600 mb-1">
                 TOTAL DEEP WORK
               </Text>
-              <Text className="text-2xl">35:00:43</Text>
+              <Text className="text-2xl">
+                {isAnalyticsLoading ? "..." : analytics.totalDeepWork}
+              </Text>
+            </View>
+            <View className="flex-row justify-end mb-4">
+              <TouchableOpacity
+                onPress={handleRefresh}
+                disabled={isAnalyticsLoading}
+                className="p-2"
+              >
+                <FontAwesome
+                  name="refresh"
+                  size={16}
+                  color="#808080"
+                  style={{
+                    transform: [
+                      { rotate: isAnalyticsLoading ? "45deg" : "0deg" },
+                    ],
+                  }}
+                />
+              </TouchableOpacity>
             </View>
 
-            <Text className="text-sm text-gray-600 mb-2">TODAY'S SUMMARY</Text>
+            {/* Column Headers */}
+            <View className="flex-row justify-between mb-2">
+              <Text className="text-sm text-gray-600 flex-1">
+                TODAY'S SUMMARY
+              </Text>
+              <View className="flex-row w-24 justify-end">
+                <Text className="text-sm text-gray-600 w-12 text-center">
+                  QTY
+                </Text>
+                <Text className="text-sm text-gray-600 w-12 text-center">
+                  MIN
+                </Text>
+              </View>
+            </View>
 
             <View className="flex-row justify-between mb-2">
-              <Text className="text-base">
+              <Text className="text-base flex-1">
                 Deep <Text className="italic">Work</Text>
               </Text>
-              <View className="flex-row">
-                <Text className="text-base mr-4">2</Text>
-                <Text className="text-base">180</Text>
+              <View className="flex-row w-24 justify-end">
+                <Text className="text-base w-12 text-center">
+                  {isAnalyticsLoading ? "..." : analytics.deepWorkSessions}
+                </Text>
+                <Text className="text-base w-12 text-center">
+                  {isAnalyticsLoading ? "..." : analytics.deepWorkMinutes}
+                </Text>
               </View>
             </View>
 
             <View className="flex-row justify-between">
-              <Text className="text-base">
+              <Text className="text-base flex-1">
                 Deep <Text className="italic">Rest</Text>
               </Text>
-              <View className="flex-row">
-                <Text className="text-base mr-4">2</Text>
-                <Text className="text-base">180</Text>
+              <View className="flex-row w-24 justify-end">
+                <Text className="text-base w-12 text-center">
+                  {isAnalyticsLoading ? "..." : analytics.deepRestSessions}
+                </Text>
+                <Text className="text-base w-12 text-center">
+                  {isAnalyticsLoading ? "..." : analytics.deepRestMinutes}
+                </Text>
               </View>
             </View>
           </View>
