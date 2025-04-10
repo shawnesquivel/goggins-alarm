@@ -464,10 +464,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     // Use existing session ID if available
     const sessionId = currentSession?.id || uuidv4();
 
-    // Create a representation of break period for UI state
+    // Create a representation of break period for UI state - preserve original task description
     const newSession: PomodoroSession = {
       id: sessionId, // Reuse session ID
-      taskDescription: "Break",
+      taskDescription: currentSession?.taskDescription || "", // Preserve original task description
       projectId: currentSession?.projectId || "break",
       startTime: new Date(),
       duration: breakDuration,
