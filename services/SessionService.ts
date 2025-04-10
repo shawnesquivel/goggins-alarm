@@ -391,9 +391,13 @@ export const SessionService: SessionServiceInterface = {
               sessionWithUser.id
             );
 
-            const { error } = await supabase
-              .from("sessions")
-              .upsert(sessionWithUser, { onConflict: "id" });
+            const { error } = await supabase.from("sessions").upsert(
+              {
+                ...sessionWithUser,
+                user_id: user.id,
+              },
+              { onConflict: "id" }
+            );
 
             if (error) {
               console.error("Error upserting session:", error);
@@ -407,9 +411,22 @@ export const SessionService: SessionServiceInterface = {
               sessionData.id
             );
 
+            // Get the existing session from Supabase to ensure we have all required fields
+            const { data: existingSession, error: fetchError } = await supabase
+              .from("sessions")
+              .select("*")
+              .eq("id", sessionData.id)
+              .single();
+
+            if (fetchError) {
+              console.error("Error fetching existing session:", fetchError);
+              continue;
+            }
+
+            // Merge the updates with existing data to preserve required fields
             const { error } = await supabase
               .from("sessions")
-              .update(sessionData)
+              .update(sessionData) // Use update instead of upsert for session updates
               .eq("id", sessionData.id);
 
             if (error) {
@@ -442,11 +459,10 @@ export const SessionService: SessionServiceInterface = {
 
             const { error } = await supabase
               .from("periods")
-              .update(periodData)
-              .eq("id", periodData.id);
+              .upsert(periodData, { onConflict: "id" });
 
             if (error) {
-              console.error("Error updating period:", error);
+              console.error("Error upserting period:", error);
               continue;
             }
           }
