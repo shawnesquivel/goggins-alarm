@@ -400,21 +400,24 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       rest_activities_selected: activities || null,
     });
 
-    // Always mark session as completed after rest
-    await SessionService.updateSession(currentSession.id, {
-      status: "completed",
-    });
-
-    // Clean up UI state
-    setCurrentSession(null);
-    await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
-    setTimerStatus(TimerStatus.IDLE);
-    await SessionService.setCurrentPeriod(null);
-
     // Force sync to Supabase
     await SessionService.syncToSupabase();
 
-    // Starting new work session is handled by UI
+    // Save current session info before transitioning
+    const sessionId = currentSession.id;
+    const projectId = currentSession.projectId;
+
+    // Get the task description from the database session record
+    const dbSession = await SessionService.getSession(sessionId);
+    const taskDescription = dbSession?.task || "Couldn't Find Task Description"; // TODO: Remove for production
+
+    // Clear the current period to prepare for the next one
+    await SessionService.setCurrentPeriod(null);
+
+    // If startNewWork is true, immediately start the next work period
+    if (startNewWork) {
+      await startNextWorkPeriod(sessionId, projectId, taskDescription);
+    }
   };
 
   // Keep for backward compatibility, but simplified
@@ -592,6 +595,76 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     // Clear current period in SessionService
     await SessionService.setCurrentPeriod(null);
+  };
+
+  // New function to start the next work period in the same session
+  const startNextWorkPeriod = async (
+    sessionId: string,
+    projectId: string,
+    taskDescription: string,
+    customDuration?: number
+  ) => {
+    console.log(
+      "AlarmContext: Starting next work period in session",
+      sessionId
+    );
+
+    // Reset overtime state
+    isOvertimeRef.current = false;
+    setIsOvertime(false);
+
+    // Use default focus duration if none specified
+    const duration =
+      customDuration !== undefined ? customDuration : settings.focusDuration;
+
+    // Create a work session with the same session ID
+    const workSession: PomodoroSession = {
+      id: sessionId, // Reuse the same session ID
+      taskDescription,
+      projectId,
+      startTime: new Date(),
+      duration: duration,
+      isCompleted: false,
+      tags: [],
+      type: "focus",
+    };
+
+    try {
+      // Update the session status back to in_progress if needed
+      await SessionService.updateSession(sessionId, {
+        status: "in_progress",
+      });
+
+      // Create a new work period linked to the same session
+      await SessionService.createPeriod({
+        session_id: sessionId,
+        type: "work",
+        planned_duration_minutes: duration,
+        started_at: new Date().toISOString(),
+      });
+
+      console.log(
+        "AlarmContext: Created new work period in session",
+        sessionId
+      );
+    } catch (error) {
+      console.error("Error starting next work period:", error);
+      // Continue anyway - we want UI to work even if DB fails
+    }
+
+    // Update UI state
+    setCurrentSession(workSession);
+    setRemainingSeconds(Math.round(duration * 60));
+    setTimerStatus(TimerStatus.RUNNING);
+
+    // Save current session to AsyncStorage
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.CURRENT_SESSION,
+      JSON.stringify(workSession)
+    );
+
+    // Start the timer
+    startTimer();
   };
 
   return (
