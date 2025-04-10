@@ -176,3 +176,43 @@ export async function getDailyAnalytics(startDate: Date, endDate: Date) {
   if (error) throw error;
   return data;
 }
+
+export async function checkConnection() {
+  /**
+   * Test Supabase connnection with a simple query.
+   */
+  try {
+    const testClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
+
+    const { data: usersData, error: usersError } = await testClient
+      .from("users")
+      .select("id")
+      .limit(1);
+
+    if (usersError) {
+      console.error("Users table query failed:", usersError);
+    }
+
+    return true;
+  } catch (error) {
+    if (__DEV__) {
+      console.log(
+        "[supabase.ts]: Couldn't connect. Keys: ",
+        supabaseUrl,
+        supabaseAnonKey
+      );
+    }
+
+    console.error(
+      "Supabase connection check failed. Check database status with `npx supabase status`",
+      error
+    );
+    return false;
+  }
+}

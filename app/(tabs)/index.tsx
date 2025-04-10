@@ -5,12 +5,11 @@ import {
   ScrollView,
   TouchableOpacity,
   Modal,
-  Alert,
+  TextInput,
 } from "react-native";
 import { usePomodoro } from "@/contexts/AlarmContext";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useRouter, useNavigation } from "expo-router";
-import { TimerStatus } from "@/types/alarm";
 import StartSessionModal from "@/components/shared/modals/StartSessionModal";
 import {
   useFonts,
@@ -29,14 +28,10 @@ export default function TimerScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const {
-    timerStatus,
     remainingSeconds,
     currentSession,
-    pauseSession,
-    resumeSession,
-    completeSession,
-    startBreakSession,
-    settings,
+    completeWorkPeriod,
+    completeRestPeriod,
     isOvertime,
     cancelSession,
   } = usePomodoro();
@@ -53,16 +48,57 @@ export default function TimerScreen() {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [showBreakRatingModal, setShowBreakRatingModal] = useState(false);
   const [sessionNotes, setSessionNotes] = useState("");
-  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
-  const [starRating, setStarRating] = useState<number>(0);
-  const [selectedRestActivities, setSelectedRestActivities] = useState<
-    string[]
-  >([]);
-  const [selectedBreakActivities, setSelectedBreakActivities] = useState<
-    string[]
-  >([]);
+  const [starRating, setStarRating] = useState<number | null>(null);
+  const [selectedRestActivity, setSelectedRestActivity] = useState<
+    string | null
+  >(null);
+  const [isCompleteSessionScreen, setIsCompleteSessionScreen] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [isTaskComplete, setIsTaskComplete] = useState(false);
+  const [deepWorkTime, setDeepWorkTime] = useState(0);
+  const [deepRestTime, setDeepRestTime] = useState(0);
+  const [isNoteExpanded, setIsNoteExpanded] = useState(false);
+
+  // Add near other state declarations
+  enum CancelFlowStep {
+    NONE,
+    TASK_COMPLETE,
+    RATE_FOCUS, // For deep work rating
+    RATE_REST, // For deep rest rating
+    CONFIRM,
+    REFLECT,
+    SESSION_COMPLETE,
+  }
+
+  const [cancelFlowStep, setCancelFlowStep] = useState<CancelFlowStep>(
+    CancelFlowStep.NONE
+  );
+  const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
+
+  // Add effect to calculate session times when reaching SESSION_COMPLETE step
+  useEffect(() => {
+    const calculateTimes = async () => {
+      if (
+        currentSession &&
+        cancelFlowStep === CancelFlowStep.SESSION_COMPLETE
+      ) {
+        try {
+          // Use existing SessionService method to get totals
+          const totals = await SessionService.calculateSessionTotals(
+            currentSession.id
+          );
+          setDeepWorkTime(totals.total_deep_work_minutes);
+          setDeepRestTime(totals.total_deep_rest_minutes);
+        } catch (error) {
+          console.error("Error calculating session totals:", error);
+          setDeepWorkTime(0);
+          setDeepRestTime(0);
+        }
+      }
+    };
+
+    calculateTimes();
+  }, [cancelFlowStep, currentSession?.id]);
 
   // Add export ref
   const exportRef = useRef({
@@ -92,93 +128,179 @@ export default function TimerScreen() {
     return `${isOvertime ? "+" : ""}${timeString}`;
   };
 
-  // Handle session completion and rating
-  const handleCompleteSession = () => {
-    completeSession(starRating, sessionNotes, true, selectedBreakActivities);
-    setShowRatingModal(false);
-    setSessionNotes("");
-    setStarRating(0);
+  // First, create a new handler function that takes the rating as a parameter
+  const handleSubmitWithRating = (rating: number) => {
+    setStarRating(rating);
+    // Pass the rating directly to avoid race condition
+    handleSubmitWorkPeriodReflectionWithRating(rating);
   };
 
-  // Toggle selected activity
-  const toggleRestActivity = (activity: string) => {
-    if (selectedRestActivities.includes(activity)) {
-      setSelectedRestActivities(
-        selectedRestActivities.filter((a) => a !== activity)
-      );
-    } else {
-      setSelectedRestActivities([...selectedRestActivities, activity]);
-    }
-  };
+  // Modified submission function that takes the rating parameter
+  const handleSubmitWorkPeriodReflectionWithRating = async (rating: number) => {
+    if (!currentSession) return;
 
-  // Updated handler for break session completion
-  const handleCompleteBreakSession = () => {
-    completeSession(
-      undefined, // No rating for breaks
-      undefined, // No notes needed since we have activities
-      false, // Don't transition to break
-      selectedRestActivities // Pass the selected activities
-    );
-    setShowBreakRatingModal(false);
-    setSelectedRestActivities([]);
-  };
+    try {
+      // Get the current period and session from DB to check latest state
+      const currentPeriod = await SessionService.getCurrentPeriod();
+      const dbSession = await SessionService.getSession(currentSession.id);
 
-  // Handle timer controls
-  const handleTimerControls = () => {
-    // If in overtime mode and running, complete the session instead of pausing
-    if (isOvertime && timerStatus === TimerStatus.RUNNING) {
-      if (currentSession?.type === "break") {
-        setShowBreakRatingModal(true);
-      } else {
-        setShowRatingModal(true);
+      // Check if session is already completed or cancelled
+      if (!currentPeriod || !dbSession) {
+        console.log("Session or period not found, already cleaned up");
+        setShowRatingModal(false);
+        return;
       }
-      return;
-    }
 
-    switch (timerStatus) {
-      case TimerStatus.RUNNING:
-        pauseSession();
-        break;
-      case TimerStatus.PAUSED:
-        resumeSession();
-        break;
-      case TimerStatus.COMPLETED:
-        if (currentSession?.type === "break") {
-          setShowBreakRatingModal(true);
-        } else {
-          setShowRatingModal(true);
-        }
-        break;
-      default:
-        setShowStartModal(true);
-        break;
+      if (
+        dbSession.status === "completed" ||
+        dbSession.status === "cancelled"
+      ) {
+        console.log("Session already", dbSession.status);
+        setShowRatingModal(false);
+        return;
+      }
+
+      // Calculate actual duration up to now
+      const startTime = new Date(currentSession.startTime);
+      const endTime = new Date();
+      const actualSeconds = Math.floor(
+        (endTime.getTime() - startTime.getTime()) / 1000
+      );
+
+      // Use the direct rating parameter instead of state
+      await SessionService.updatePeriod(currentPeriod.id, {
+        actual_duration_minutes: actualSeconds / 60,
+        ended_at: new Date().toISOString(),
+        quality_rating: rating,
+        user_notes: sessionNotes || null,
+      });
+
+      // Close rating modal and clean up state
+      setShowRatingModal(false);
+      setStarRating(null);
+      setSessionNotes("");
+
+      // Start rest period as normal, passing the rating directly
+      completeWorkPeriod(rating, sessionNotes, true);
+    } catch (error) {
+      console.error("Error updating session for work reflection:", error);
+      // Clean up UI state even if DB update fails
+      setShowRatingModal(false);
+      setStarRating(null);
+      setSessionNotes("");
     }
   };
 
-  // Add near other state declarations
-  enum CancelFlowStep {
-    NONE,
-    CONFIRM,
-    REFLECT,
-  }
+  // Define a function that handles both selection and submission
+  const handleRestActivitySubmit = (activity: string) => {
+    // First set the selected activity (for UI feedback)
+    setSelectedRestActivity(activity);
 
-  const [cancelFlowStep, setCancelFlowStep] = useState<CancelFlowStep>(
-    CancelFlowStep.NONE
-  );
-  const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
+    // Then immediately submit with the directly passed activity
+    submitRestPeriodWithActivity(activity);
+  };
+
+  const submitRestPeriodWithActivity = async (activity: string) => {
+    if (!currentSession) return;
+
+    try {
+      // Get the current period and session from DB to check latest state
+      const currentPeriod = await SessionService.getCurrentPeriod();
+      const dbSession = await SessionService.getSession(currentSession.id);
+
+      // Check if session is already completed or cancelled
+      if (!currentPeriod || !dbSession) {
+        console.log("Session or period not found, already cleaned up");
+        setShowBreakRatingModal(false);
+        return;
+      }
+
+      if (
+        dbSession.status === "completed" ||
+        dbSession.status === "cancelled"
+      ) {
+        console.log("Session already", dbSession.status);
+        setShowBreakRatingModal(false);
+        return;
+      }
+
+      // Calculate actual duration up to now
+      const startTime = new Date(currentSession.startTime);
+      const endTime = new Date();
+      const actualSeconds = Math.floor(
+        (endTime.getTime() - startTime.getTime()) / 1000
+      );
+
+      // Keep as array with single element to match DB schema
+      const activityArray = [activity];
+
+      // Update period with rest activity
+      await SessionService.updatePeriod(currentPeriod.id, {
+        actual_duration_minutes: actualSeconds / 60,
+        ended_at: new Date().toISOString(),
+        rest_activities_selected: activityArray, // Single element array
+      });
+
+      // Close modal and clean up state
+      setShowBreakRatingModal(false);
+      setSelectedRestActivity(null);
+
+      // Complete rest period and continue to next work period
+      // Note: This assumes we'll modify AlarmContext's completeRestPeriod
+      // to automatically start the next work period
+      completeRestPeriod(activityArray, true);
+    } catch (error) {
+      console.error("Error updating session for rest reflection:", error);
+      // Clean up UI state even if DB update fails
+      setShowBreakRatingModal(false);
+      setSelectedRestActivity(null);
+    }
+  };
 
   // Update existing handler
   const handleCancelSession = () => {
-    setCancelFlowStep(CancelFlowStep.CONFIRM);
+    console.log("Starting cancel flow with task completion check");
+    setCancelFlowStep(CancelFlowStep.TASK_COMPLETE);
   };
 
   // Add new handlers
   const handleStartReflection = () => {
+    setIsTaskComplete(false);
     setCancelFlowStep(CancelFlowStep.REFLECT);
   };
 
-  const handleSubmitReflection = async () => {
+  const handleTaskComplete = () => {
+    setIsTaskComplete(true);
+    // Route to appropriate rating screen based on session type
+    setCancelFlowStep(
+      currentSession?.type === "focus"
+        ? CancelFlowStep.RATE_FOCUS
+        : CancelFlowStep.RATE_REST
+    );
+  };
+
+  const handleTaskIncomplete = () => {
+    setIsTaskComplete(false);
+    setCancelFlowStep(
+      currentSession?.type === "focus"
+        ? CancelFlowStep.RATE_FOCUS
+        : CancelFlowStep.RATE_REST
+    );
+  };
+
+  // Update to accept direct parameter
+  const handleSubmitReflection = async (selectedReason?: string) => {
     if (!currentSession) return;
+
+    // Capture current state values to avoid race conditions
+    const currentRating = starRating;
+    const currentActivity = selectedRestActivity;
+    const currentTaskComplete = isTaskComplete;
+
+    // Use directly passed reason if provided, otherwise use state
+    const currentReasons = selectedReason
+      ? [selectedReason]
+      : [...selectedReasons];
 
     try {
       // Get the current period and session from DB to check latest state
@@ -190,6 +312,8 @@ export default function TimerScreen() {
         console.log("Session or period not found, already cleaned up");
         setCancelFlowStep(CancelFlowStep.NONE);
         setSelectedReasons([]);
+        setStarRating(null);
+        setSelectedRestActivity(null);
         return;
       }
 
@@ -200,6 +324,8 @@ export default function TimerScreen() {
         console.log("Session already", dbSession.status);
         setCancelFlowStep(CancelFlowStep.NONE);
         setSelectedReasons([]);
+        setStarRating(null);
+        setSelectedRestActivity(null);
         return;
       }
 
@@ -210,21 +336,27 @@ export default function TimerScreen() {
         (endTime.getTime() - startTime.getTime()) / 1000
       );
 
-      // Update period with reflection data
+      // Update period with reflection data - use captured values
       await SessionService.updatePeriod(currentPeriod.id, {
         actual_duration_minutes: actualSeconds / 60,
         ended_at: new Date().toISOString(),
-        completed: false,
-        distraction_reasons_selected:
-          selectedReasons.length > 0 ? selectedReasons : null,
+        // Use the appropriate rating based on session type
+        quality_rating: currentSession.type === "focus" ? currentRating : null,
+        rest_activities_selected:
+          currentSession.type === "break" && currentActivity
+            ? [currentActivity]
+            : null,
+        work_time_completed: currentTaskComplete,
       });
 
-      // Update session with reflection data
+      // Update session with reflection data - use captured values
       await SessionService.updateSession(currentSession.id, {
-        status: "cancelled",
-        cancelled_reasons: selectedReasons.length > 0 ? selectedReasons : null,
+        status: currentTaskComplete ? "completed" : "cancelled",
+        completed: currentTaskComplete,
+        distraction_reasons_selected:
+          currentReasons.length > 0 ? currentReasons : null,
+        // Ignore: Future - will allow user to add notes.
         cancelled_reason_details: null,
-        completed: false,
       });
 
       // Force sync to Supabase
@@ -232,18 +364,27 @@ export default function TimerScreen() {
 
       // Call the context's cancelSession to clean up UI state
       cancelSession();
+
+      // Clear all state
       setCancelFlowStep(CancelFlowStep.NONE);
       setSelectedReasons([]);
+      setStarRating(null);
+      setSelectedRestActivity(null);
     } catch (error) {
       console.error("Error updating session with reflection:", error);
       // Clean up UI state even if DB update fails
       setCancelFlowStep(CancelFlowStep.NONE);
       setSelectedReasons([]);
+      setStarRating(null);
+      setSelectedRestActivity(null);
     }
   };
 
-  const handleSkipReflection = async () => {
+  const handleSkipSessionReflection = async () => {
     if (!currentSession) return;
+
+    // Capture current state for task completion
+    const currentTaskComplete = isTaskComplete;
 
     try {
       // Get the current period and session from DB to check latest state
@@ -255,6 +396,8 @@ export default function TimerScreen() {
         console.log("Session or period not found, already cleaned up");
         setCancelFlowStep(CancelFlowStep.NONE);
         setSelectedReasons([]);
+        setStarRating(null);
+        setSelectedRestActivity(null);
         return;
       }
 
@@ -265,6 +408,8 @@ export default function TimerScreen() {
         console.log("Session already", dbSession.status);
         setCancelFlowStep(CancelFlowStep.NONE);
         setSelectedReasons([]);
+        setStarRating(null);
+        setSelectedRestActivity(null);
         return;
       }
 
@@ -275,20 +420,22 @@ export default function TimerScreen() {
         (endTime.getTime() - startTime.getTime()) / 1000
       );
 
+      // Clear selected reasons before updating
+      setSelectedReasons([]);
+
       // Update period with null reflection data
       await SessionService.updatePeriod(currentPeriod.id, {
         actual_duration_minutes: actualSeconds / 60,
         ended_at: new Date().toISOString(),
-        completed: false,
-        distraction_reasons_selected: null,
+        work_time_completed: currentTaskComplete,
       });
 
       // Update session with null reflection data
       await SessionService.updateSession(currentSession.id, {
-        status: "cancelled",
-        cancelled_reasons: null,
+        status: currentTaskComplete ? "completed" : "cancelled",
+        completed: currentTaskComplete,
         cancelled_reason_details: "Skipped reflection",
-        completed: false,
+        distraction_reasons_selected: null,
       });
 
       // Force sync to Supabase
@@ -296,27 +443,96 @@ export default function TimerScreen() {
 
       // Call the context's cancelSession to clean up UI state
       cancelSession();
+
+      // Clear all state
       setCancelFlowStep(CancelFlowStep.NONE);
-      setSelectedReasons([]);
+      setStarRating(null);
+      setSelectedRestActivity(null);
     } catch (error) {
       console.error("Error updating session for skip reflection:", error);
       // Clean up UI state even if DB update fails
       setCancelFlowStep(CancelFlowStep.NONE);
       setSelectedReasons([]);
+      setStarRating(null);
+      setSelectedRestActivity(null);
     }
   };
 
   const toggleReason = (reason: string) => {
-    setSelectedReasons((prev) =>
-      prev.includes(reason)
-        ? prev.filter((r) => r !== reason)
-        : [...prev, reason]
-    );
+    // Set the selected reason for UI feedback
+    setSelectedReasons([reason]);
+
+    // If NONE is selected, handle like skip
+    if (reason === "NONE") {
+      // Instead of skipping directly to home, go to session complete
+      setCancelFlowStep(CancelFlowStep.SESSION_COMPLETE);
+      return;
+    }
+
+    // For other reasons, go to session complete screen
+    setCancelFlowStep(CancelFlowStep.SESSION_COMPLETE);
   };
 
   // Replace showCancelConfirmation modal with this
   const renderCancelFlow = () => {
     switch (cancelFlowStep) {
+      case CancelFlowStep.TASK_COMPLETE:
+        return (
+          <Modal
+            visible={true}
+            animationType="fade"
+            transparent={true}
+            onRequestClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
+          >
+            <View className="flex-1 bg-white justify-center">
+              {/* Back button in top left */}
+              <View className="absolute left-6 top-12 z-10">
+                <TouchableOpacity
+                  onPress={() => setCancelFlowStep(CancelFlowStep.NONE)}
+                  className="p-2"
+                >
+                  <FontAwesome name="chevron-left" size={20} color="#000" />
+                </TouchableOpacity>
+              </View>
+
+              <View className="flex-1 justify-center items-center px-6">
+                {/* Simplified header with larger text */}
+                <Text className="text-4xl font-medium mb-1">
+                  Task <Text className="italic">complete?</Text>
+                </Text>
+
+                {/* Only show task description if needed */}
+                {currentSession?.taskDescription && (
+                  <Text className="text-lg text-center mb-12 max-w-[300px]">
+                    {currentSession.taskDescription}
+                  </Text>
+                )}
+
+                {/* Action buttons with improved styling */}
+                <View className="w-full max-w-[350px]">
+                  <TouchableOpacity
+                    className="bg-black py-4 rounded-md items-center mb-4"
+                    onPress={handleTaskComplete}
+                  >
+                    <Text className="text-white text-base font-medium">
+                      YES, I FINISHED MY TASK
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    className="border border-gray-300 bg-white py-4 rounded-md items-center"
+                    onPress={handleTaskIncomplete}
+                  >
+                    <Text className="text-black text-base font-medium">
+                      NO, END CYCLE EARLY
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        );
+
       case CancelFlowStep.CONFIRM:
         return (
           <Modal
@@ -327,21 +543,6 @@ export default function TimerScreen() {
           >
             <View className="flex-1 bg-black/50 justify-center items-center">
               <View className="bg-[#C2C1BB] rounded-3xl p-8 w-[95%] max-w-[500px] mx-4">
-                {/* Existing cancel confirmation content */}
-                <View className="flex-row items-start justify-between mb-8">
-                  <Text className="text-black text-base flex-1 mr-4">
-                    IF YOU FINISHED THE TASK, MARK IT AS COMPLETE:
-                  </Text>
-                  <TouchableOpacity
-                    className="w-8 h-8 rounded-full border-2 border-black items-center justify-center"
-                    onPress={() => setIsTaskComplete(!isTaskComplete)}
-                  >
-                    {isTaskComplete && (
-                      <FontAwesome name="check" size={16} color="#000" />
-                    )}
-                  </TouchableOpacity>
-                </View>
-
                 <Text className="text-4xl text-center mb-2">End session</Text>
                 <Text className="text-4xl italic text-center mb-12">
                   early?
@@ -351,7 +552,7 @@ export default function TimerScreen() {
                   INTENTION TO FINISH:
                 </Text>
                 <Text className="text-xl text-center mb-10">
-                  {currentSession?.taskDescription || "creating a landing page"}
+                  {currentSession?.taskDescription}
                 </Text>
 
                 <Text className="text-lg text-center mb-8">
@@ -387,12 +588,29 @@ export default function TimerScreen() {
         );
 
       case CancelFlowStep.REFLECT:
+        const reasonIcons = [
+          {
+            label: "SOCIAL MEDIA / PHONE",
+            icon: "mobile" as const,
+          },
+          {
+            label: "EXTERNAL DISTRACTIONS",
+            icon: "volume-up" as const,
+          },
+          {
+            label: "LOW ENERGY",
+            icon: "battery-quarter" as const,
+          },
+          { label: "CHANGE IN PRIORITIES", icon: "exchange" as const },
+          { label: "NONE", icon: "check" as const },
+        ];
+
         return (
           <Modal
             visible={true}
             animationType="fade"
             transparent={true}
-            onRequestClose={() => setCancelFlowStep(CancelFlowStep.CONFIRM)}
+            onRequestClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
           >
             <View className="flex-1 bg-black/50 justify-center items-center">
               <View className="bg-[#C2C1BB] rounded-3xl p-8 w-[95%] max-w-[500px] mx-4">
@@ -402,63 +620,256 @@ export default function TimerScreen() {
                 </Text>
 
                 <Text className="text-base uppercase text-center mb-2">
-                  INTENTION TO FINISH:
+                  {isTaskComplete ? "COMPLETED TASK:" : "INCOMPLETE TASK:"}
                 </Text>
                 <Text className="text-xl text-center mb-10">
                   {currentSession?.taskDescription}
                 </Text>
 
                 <Text className="text-lg text-center mb-8">
-                  You set a clear intention. Even if you didn't finish, it
-                  matters that you noticed.
+                  {isTaskComplete
+                    ? "You hit your goal. Anything distracting you?"
+                    : "You fell short of your goal. Let's figure out why, so you can improve for next time."}
                 </Text>
 
-                {/* Reason Buttons */}
-                {[
-                  "SOCIAL MEDIA / PHONE",
-                  "EXTERNAL DISTRACTIONS",
-                  "LOW ENERGY",
-                  "CHANGE IN PRIORITIES",
-                ].map((reason) => (
+                {/* Reason Buttons with Icons */}
+                {reasonIcons.map((reason) => (
                   <TouchableOpacity
-                    key={reason}
-                    className={`bg-white py-5 px-6 rounded-3xl items-center mb-4 shadow-sm flex-row justify-between
-                      ${
-                        selectedReasons.includes(reason)
-                          ? "border border-[#C2C1BB]"
-                          : ""
-                      }`}
-                    onPress={() => toggleReason(reason)}
+                    key={reason.label}
+                    className="bg-white py-5 px-6 rounded-3xl items-center mb-4 shadow-sm flex-row justify-between"
+                    onPress={() => toggleReason(reason.label)}
                   >
-                    <Text
-                      className="text-black text-lg"
-                      style={{ fontFamily: "System" }}
+                    <View className="flex-row items-center">
+                      <FontAwesome
+                        name={reason.icon}
+                        size={20}
+                        color="#555"
+                        style={{ marginRight: 12 }}
+                      />
+                      <Text
+                        className="text-black text-lg"
+                        style={{ fontFamily: "System" }}
+                      >
+                        {reason.label}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </Modal>
+        );
+
+      case CancelFlowStep.RATE_FOCUS:
+        return (
+          <Modal
+            visible={true}
+            animationType="fade"
+            transparent={true}
+            onRequestClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
+          >
+            <View className="flex-1 bg-white justify-center items-center">
+              <View className="w-full max-w-[400px] px-8">
+                <Text className="text-4xl text-center mb-1">Rate your</Text>
+                <Text className="text-4xl italic text-center mb-8">
+                  Deep Work
+                </Text>
+
+                <Text className="text-sm uppercase text-center mb-2">
+                  TASK:
+                </Text>
+                <Text className="text-lg text-center mb-12">
+                  {currentSession?.taskDescription}
+                </Text>
+
+                {/* Star Rating */}
+                <View className="flex-row justify-center mb-8">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <TouchableOpacity
+                      key={star}
+                      onPress={() => handleCancelFlowFocusRating(star)}
+                      className="mx-2"
                     >
-                      {reason}
+                      <FontAwesome
+                        name={(starRating ?? 0) >= star ? "star" : "star-o"}
+                        size={36}
+                        color={
+                          (starRating ?? 0) >= star ? "#FFD700" : "#CCCCCC"
+                        }
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <Text className="text-sm text-gray-600 text-center uppercase mb-12">
+                  Enter a rating.
+                </Text>
+              </View>
+            </View>
+          </Modal>
+        );
+
+      case CancelFlowStep.RATE_REST:
+        return (
+          <Modal
+            visible={true}
+            animationType="slide"
+            transparent={true}
+            onRequestClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
+          >
+            <View className="flex-1 bg-black/50 justify-center items-center">
+              <View className="bg-white rounded-xl p-6 w-[90%] max-w-[400px]">
+                <Text className="text-2xl font-medium text-center mb-1">
+                  What did you do
+                </Text>
+                <Text className="text-2xl font-medium italic text-center mb-4">
+                  for Deep Rest
+                </Text>
+
+                {currentSession && (
+                  <>
+                    <Text className="text-sm text-gray-600 text-center mb-1">
+                      YOUR REST SESSION ON:
                     </Text>
-                    {selectedReasons.includes(reason) && (
-                      <View className="bg-[#C2C1BB] rounded-full p-1">
-                        <FontAwesome name="check" size={16} color="#fff" />
-                      </View>
+                    <Text className="text-base text-center mb-6">
+                      {getProjectName(currentSession.projectId)}
+                    </Text>
+                  </>
+                )}
+
+                {/* Activity selection buttons */}
+                {[
+                  { label: "MOVEMENT", icon: "arrow-right" as const },
+                  { label: "REFUEL", icon: "coffee" as const },
+                  { label: "SOCIALIZING", icon: "users" as const },
+                  { label: "MINDFULNESS", icon: "heart" as const },
+                  { label: "SOCIAL MEDIA", icon: "mobile" as const },
+                ].map(({ label, icon }) => (
+                  <TouchableOpacity
+                    key={label}
+                    className={`py-3 px-4 mb-3 rounded-md ${
+                      selectedRestActivity === label
+                        ? "bg-gray-200 border border-gray-300"
+                        : "bg-gray-100"
+                    } flex-row justify-between items-center`}
+                    onPress={() => handleCancelFlowRestRating(label)}
+                  >
+                    <View className="flex-row items-center">
+                      <FontAwesome
+                        name={icon}
+                        size={16}
+                        color="#555"
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text className="text-base text-gray-800">{label}</Text>
+                    </View>
+                    {selectedRestActivity === label && (
+                      <FontAwesome name="check" size={16} color="#666" />
                     )}
                   </TouchableOpacity>
                 ))}
+              </View>
+            </View>
+          </Modal>
+        );
 
-                <TouchableOpacity
-                  className="bg-black py-5 rounded-3xl items-center mb-4"
-                  onPress={handleSubmitReflection}
-                >
-                  <Text className="text-white text-lg font-medium">
-                    SUBMIT & END SESSION
+      case CancelFlowStep.SESSION_COMPLETE:
+        return (
+          <Modal
+            visible={true}
+            animationType="fade"
+            transparent={true}
+            onRequestClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
+          >
+            <View className="flex-1 bg-white justify-center items-center px-6">
+              <View className="w-full max-w-[400px]">
+                {/* Header */}
+                <Text className="text-3xl text-center font-medium mb-1">
+                  You <Text className="italic">locked in</Text>
+                </Text>
+
+                {/* Conditional text based on task completion */}
+                <Text className="text-center mb-8">
+                  {isTaskComplete
+                    ? "Well done is better than well said."
+                    : "You showed up despite the distractions."}
+                </Text>
+
+                {/* Task Summary Box */}
+                <View className="bg-gray-200 rounded-xl p-6 mb-8">
+                  <Text className="uppercase text-center mb-2 text-xs font-semibold">
+                    TASK:
                   </Text>
-                </TouchableOpacity>
+                  <Text className="text-xl text-center mb-6">
+                    {currentSession?.taskDescription ||
+                      getProjectName(currentSession?.projectId || "")}
+                  </Text>
 
+                  {/* Checkmark if task was completed */}
+                  {isTaskComplete && (
+                    <View className="absolute top-4 right-4">
+                      <View className="bg-yellow-300 rounded-full p-1">
+                        <FontAwesome name="check" size={16} color="#000" />
+                      </View>
+                    </View>
+                  )}
+
+                  <View className="flex-row justify-between">
+                    <View className="items-center">
+                      <Text className="text-3xl font-medium">
+                        {formatTimeSummary(deepWorkTime)}
+                      </Text>
+                      <Text className="text-xs uppercase text-center">
+                        DEEP WORK{"\n"}TIME ELAPSED
+                      </Text>
+                    </View>
+                    <View className="items-center">
+                      <Text className="text-3xl font-medium">
+                        {formatTimeSummary(deepRestTime)}
+                      </Text>
+                      <Text className="text-xs uppercase text-center">
+                        DEEP REST{"\n"}TIME ELAPSED
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Conditional notes input */}
+                {isNoteExpanded ? (
+                  <View className="mb-8">
+                    <TextInput
+                      className="border border-gray-300 p-4 rounded-lg bg-white"
+                      placeholder="Add your reflection note here..."
+                      value={sessionNotes}
+                      onChangeText={setSessionNotes}
+                      multiline
+                      numberOfLines={3}
+                      maxLength={200}
+                      textAlignVertical="top"
+                      style={{ minHeight: 80 }}
+                      autoFocus={true}
+                    />
+                    <View className="flex-row justify-end mt-1">
+                      <Text className="text-xs text-gray-500">
+                        {sessionNotes.length}/200 characters
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    className="border border-gray-300 py-3 rounded-lg mb-8 bg-white"
+                    onPress={() => setIsNoteExpanded(true)}
+                  >
+                    <Text className="text-center">ADD NOTE...</Text>
+                  </TouchableOpacity>
+                )}
+
+                {/* Complete Session Button */}
                 <TouchableOpacity
-                  className="py-3 items-center"
-                  onPress={handleSkipReflection}
+                  className="bg-black py-4 rounded-lg"
+                  onPress={handleFinalizeSession}
                 >
-                  <Text className="text-black text-base">
-                    SKIP & END SESSION
+                  <Text className="text-white text-center font-medium">
+                    COMPLETE SESSION
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -471,35 +882,10 @@ export default function TimerScreen() {
     }
   };
 
-  // Get appropriate button text based on timer status
-  const getButtonText = (): string => {
-    // If in overtime mode, always show "Complete" instead of "Pause"
-    if (isOvertime && timerStatus === TimerStatus.RUNNING) {
-      return "Complete";
-    }
-
-    switch (timerStatus) {
-      case TimerStatus.RUNNING:
-        return "Pause";
-      case TimerStatus.PAUSED:
-        return "Resume";
-      case TimerStatus.COMPLETED:
-        return "Complete";
-      default:
-        return "Start Focus";
-    }
-  };
-
   // Get project name by ID
   const getProjectName = (id: string): string => {
     const project = projects.find((p) => p.id === id);
     return project ? project.name : "Select Project";
-  };
-
-  // Get project goal by ID
-  const getProjectGoal = (id: string): string | undefined => {
-    const project = projects.find((p) => p.id === id);
-    return project?.goal;
   };
 
   // Full screen timer component
@@ -525,9 +911,8 @@ export default function TimerScreen() {
             {currentSession?.type === "focus" ? "WORKING ON:" : "RESTING FROM:"}
           </Text>
           <Text className="text-base mb-6 text-center">
-            {currentSession?.taskDescription !== "Break"
-              ? currentSession?.taskDescription
-              : getProjectName(currentSession?.projectId || "")}
+            {currentSession?.taskDescription ||
+              getProjectName(currentSession?.projectId || "")}
           </Text>
 
           {/* Timer in white box */}
@@ -608,37 +993,35 @@ export default function TimerScreen() {
     if (!session) {
       return (
         <View className="p-2.5 m-2.5 bg-gray-100 rounded border border-gray-300">
-          <Text className="text-xs font-mono mb-1">
-            Status: Not authenticated
-          </Text>
           <TouchableOpacity
             className="mt-2 bg-red-400 p-1.5 rounded items-center"
             onPress={() => router.push("/login")}
           >
-            <Text className="text-white text-xs font-bold">Go to Login</Text>
+            <Text className="text-white text-xs font-bold">
+              Not Logged In: Go to Login
+            </Text>
           </TouchableOpacity>
         </View>
       );
     }
-
     return (
       <View className="p-2.5 m-2.5 bg-gray-100 rounded border border-gray-300">
-        <Text className="text-xs font-mono mb-1">Status: Authenticated ✓</Text>
-        <Text className="text-xs font-mono mb-1">
-          User: {session.user.email}
-        </Text>
-        <Text className="text-xs font-mono mb-1">
-          ID: {session.user.id.substring(0, 8)}...
-        </Text>
-        <TouchableOpacity
-          className="mt-2 bg-red-400 p-1.5 rounded items-center"
-          onPress={async () => {
-            await supabase.auth.signOut();
-            router.replace("/login");
-          }}
-        >
-          <Text className="text-white text-xs font-bold">Sign Out</Text>
-        </TouchableOpacity>
+        <View className="flex-row items-center gap-4">
+          <View className="flex-row items-center space-x-2">
+            <Text className="text-xs font-mono">
+              User: {session.user.email} ({session.user.id.substring(0, 8)})
+            </Text>
+          </View>
+          <TouchableOpacity
+            className="bg-red-400 px-3 py-1 rounded"
+            onPress={async () => {
+              await supabase.auth.signOut();
+              router.replace("/login");
+            }}
+          >
+            <Text className="text-white text-xs font-bold">Sign Out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -655,6 +1038,61 @@ export default function TimerScreen() {
     return `${hours}h ${minutes}m`;
   };
 
+  const handleCancelFlowFocusRating = (rating: number) => {
+    // Capture current value to avoid race conditions
+    setStarRating(rating);
+    // Move to reflection step
+    setCancelFlowStep(CancelFlowStep.REFLECT);
+  };
+
+  const handleCancelFlowRestRating = (activity: string) => {
+    // Capture current value to avoid race conditions
+    setSelectedRestActivity(activity);
+    // Move to reflection step
+    setCancelFlowStep(CancelFlowStep.REFLECT);
+  };
+
+  // Define the formatTimeSummary function before renderCancelFlow
+  const formatTimeSummary = (minutes: number): string => {
+    if (minutes < 60) {
+      return `${Math.floor(minutes)}:00`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      const mins = Math.floor(minutes % 60);
+      return `${hours}:${mins.toString().padStart(2, "0")}`;
+    }
+  };
+
+  const handleFinalizeSession = async () => {
+    if (!currentSession) {
+      setCancelFlowStep(CancelFlowStep.NONE);
+      return;
+    }
+
+    try {
+      // Update session with notes
+      await SessionService.updateSession(currentSession.id, {
+        user_notes: sessionNotes || null,
+      });
+
+      // Force sync to Supabase
+      await SessionService.syncToSupabase();
+
+      // Call context's cancelSession to clean up UI state
+      cancelSession();
+    } catch (error) {
+      console.error("Error finalizing session:", error);
+    } finally {
+      // Always clean up UI state
+      setCancelFlowStep(CancelFlowStep.NONE);
+      setSelectedReasons([]);
+      setStarRating(null);
+      setSelectedRestActivity(null);
+      setSessionNotes(""); // Clear session notes
+      setIsNoteExpanded(false);
+    }
+  };
+
   return isFullScreen ? (
     <FullScreenTimer />
   ) : (
@@ -663,25 +1101,71 @@ export default function TimerScreen() {
       contentContainerStyle={{ padding: 20 }}
     >
       {/* Auth Debug Panel (only in development mode) */}
-      {__DEV__ && renderAuthDebug()}
+      {/* {__DEV__ && renderAuthDebug()} */}
 
       {/* Session Debug Panel (only in development mode) */}
-      {__DEV__ && renderSessionDebug()}
+      {/* {__DEV__ && renderSessionDebug()} */}
 
-      {/* Timer Display */}
-      <View className="items-center py-10">
+      {/* Overview PlaceHolders */}
+      {!currentSession && (
+        <View className="w-full bg-white rounded-lg mb-4">
+          <View className="px-4 py-3">
+            <Text className="text-sm text-gray-600 mb-1">
+              WELCOME BACK SHAY,
+            </Text>
+            <Text className="text-2xl font-medium mb-4">Wed, Apr 2</Text>
+
+            <View className="flex-row justify-between mb-4">
+              <Text className="text-sm font-medium">OVERVIEW</Text>
+              <Text className="text-sm text-gray-400">TASKS</Text>
+            </View>
+
+            <View className="items-center mb-6">
+              <View className="w-32 h-32 bg-gray-100 rounded-full mb-4" />
+              <Text className="text-sm text-gray-600 mb-1">
+                TOTAL DEEP WORK
+              </Text>
+              <Text className="text-2xl">35:00:43</Text>
+            </View>
+
+            <Text className="text-sm text-gray-600 mb-2">TODAY'S SUMMARY</Text>
+
+            <View className="flex-row justify-between mb-2">
+              <Text className="text-base">
+                Deep <Text className="italic">Work</Text>
+              </Text>
+              <View className="flex-row">
+                <Text className="text-base mr-4">2</Text>
+                <Text className="text-base">180</Text>
+              </View>
+            </View>
+
+            <View className="flex-row justify-between">
+              <Text className="text-base">
+                Deep <Text className="italic">Rest</Text>
+              </Text>
+              <View className="flex-row">
+                <Text className="text-base mr-4">2</Text>
+                <Text className="text-base">180</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Home Page Timer Display */}
+      <View className="items-center py-8">
         {currentSession ? (
           <>
-            <Text className="text-2xl font-bold italic mb-2 text-center">
+            {/* Session Active */}
+            <Text className="text-2xl font-bold italic mb-4 text-center">
               Deep {currentSession.type === "focus" ? "Work" : "Rest"}
             </Text>
 
-            <Text className="text-sm text-gray-600 text-center uppercase mb-1">
-              {currentSession.type === "focus"
-                ? "WORKING ON:"
-                : "RESTING FROM:"}
+            <Text className="text-xs text-gray-600 text-center uppercase mb-2">
+              WORKING ON:
             </Text>
-            <Text className="text-base mb-6 text-center">
+            <Text className="text-base mb-8 text-center">
               {currentSession.taskDescription !== "Break"
                 ? currentSession.taskDescription
                 : getProjectName(currentSession.projectId)}
@@ -689,12 +1173,12 @@ export default function TimerScreen() {
 
             {/* Timer in white box */}
             <View
-              className={`bg-white rounded-md p-6 mb-6 shadow-md w-[65%] items-center ${
+              className={`bg-white rounded-md p-4 mb-10 shadow-md w-[90%] items-center ${
                 isOvertime ? "bg-gray-100" : "bg-white"
               }`}
             >
               <Text
-                className={`text-[60px] font-bold ${
+                className={`text-[72px] font-bold ${
                   isOvertime ? "text-black" : "text-black"
                 }`}
                 style={{ fontFamily: "LibreCaslonText_400Regular" }}
@@ -718,7 +1202,7 @@ export default function TimerScreen() {
                   <FontAwesome name="check" size={12} color="#000" /> YOU HIT
                   YOUR GOAL OF {currentSession.duration} MIN
                 </Text>
-                <Text className="text-sm text-gray-600 mb-4">
+                <Text className="text-sm text-gray-600 mb-8">
                   TIME ELAPSED: {Math.floor(currentSession.duration)}:
                   {((currentSession.duration % 1) * 60)
                     .toFixed(0)
@@ -730,7 +1214,7 @@ export default function TimerScreen() {
 
             {/* Action Buttons */}
             <TouchableOpacity
-              className="bg-black py-4 px-6 rounded-md items-center w-full mb-3"
+              className="bg-black py-5 px-6 rounded-md items-center w-full mb-4"
               onPress={() => {
                 if (currentSession?.type === "focus") {
                   setShowRatingModal(true);
@@ -740,30 +1224,37 @@ export default function TimerScreen() {
               }}
             >
               <Text className="text-white text-base font-bold">
-                {currentSession?.type === "focus"
-                  ? isOvertime
-                    ? "TAKE A DEEP REST"
-                    : "END DEEP WORK EARLY"
-                  : "START DEEP WORK"}
+                {currentSession?.type === "focus" && isOvertime
+                  ? "START DEEP REST"
+                  : currentSession?.type === "focus" &&
+                    !isOvertime &&
+                    "START DEEP REST EARLY"}
+                {currentSession?.type === "break" && "CONTINUE DEEP WORK"}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              className="py-3 px-6 rounded-md items-center w-full mb-3"
+              className="py-4 px-6 rounded-md items-center w-full mb-3"
               onPress={handleCancelSession}
             >
-              <Text className="text-black text-base">END WORK SESSION</Text>
+              <Text className="text-black text-base">
+                END CYCLE (Cancel Session)
+              </Text>
             </TouchableOpacity>
 
             {/* Add Export Button */}
-            <TouchableOpacity
-              className="py-3 px-6 rounded-md items-center w-full border border-gray-200"
-              onPress={() => setShowExportModal(true)}
-            >
-              <Text className="text-black text-base">SHARE DEEP WORK</Text>
-            </TouchableOpacity>
+            {/* Future: Only show this if we are on Complete Session Modal */}
+            {isCompleteSessionScreen && (
+              <TouchableOpacity
+                className="py-3 px-6 rounded-md items-center w-full border border-gray-200"
+                onPress={() => setShowExportModal(true)}
+              >
+                <Text className="text-black text-base">SHARE DEEP WORK</Text>
+              </TouchableOpacity>
+            )}
           </>
         ) : (
+          // No sesssion active
           <View className="items-center w-full">
             <TouchableOpacity
               className="bg-black py-4 px-6 rounded-md items-center w-full mb-3"
@@ -790,22 +1281,24 @@ export default function TimerScreen() {
         transparent={true}
         onRequestClose={() => setShowRatingModal(false)}
       >
-        <View className="flex-1 bg-black/50 justify-center items-center">
-          <View className="bg-white rounded-xl p-6 w-[90%] max-w-[400px]">
-            <Text className="text-2xl font-medium mb-2 text-center">
-              Rate your
-            </Text>
-            <Text className="text-2xl font-bold mb-6 text-center italic">
-              Deep Work
-            </Text>
+        <View className="flex-1 bg-white justify-center items-center">
+          <View className="w-full max-w-[400px] px-8">
+            {/* Change to back arrow in top left corner */}
+            <View className="absolute left-4 top-4">
+              <TouchableOpacity
+                onPress={() => setShowRatingModal(false)}
+                className="p-2"
+              >
+                <FontAwesome name="chevron-left" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
 
-            {currentSession && (
-              <Text className="text-sm text-gray-600 text-center mb-2">
-                YOUR 1ST WORK SESSION ON:
-              </Text>
-            )}
-            <Text className="text-lg mb-8 text-center">
-              {currentSession?.taskDescription || "Creating a landing page"}
+            <Text className="text-4xl text-center mb-1">Rate your</Text>
+            <Text className="text-4xl italic text-center mb-8">Deep Work</Text>
+
+            <Text className="text-sm uppercase text-center mb-2">TASK:</Text>
+            <Text className="text-lg text-center mb-12">
+              {currentSession?.taskDescription}
             </Text>
 
             {/* Star Rating */}
@@ -813,19 +1306,19 @@ export default function TimerScreen() {
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity
                   key={star}
-                  onPress={() => setStarRating(star)}
+                  onPress={() => handleSubmitWithRating(star)}
                   className="mx-2"
                 >
                   <FontAwesome
-                    name={starRating >= star ? "star" : "star-o"}
+                    name={(starRating ?? 0) >= star ? "star" : "star-o"}
                     size={36}
-                    color={starRating >= star ? "#FFD700" : "#CCCCCC"}
+                    color={(starRating ?? 0) >= star ? "#FFD700" : "#CCCCCC"}
                   />
                 </TouchableOpacity>
               ))}
             </View>
 
-            <Text className="text-sm text-gray-500 text-center mb-8">
+            <Text className="text-sm text-gray-600 text-center uppercase mb-12">
               TIME ELAPSED:{" "}
               {currentSession
                 ? Math.round(
@@ -833,30 +1326,9 @@ export default function TimerScreen() {
                       new Date(currentSession.startTime).getTime()) /
                       60000
                   )
-                : 0}{" "}
-              min
+                : 0}
+              :50
             </Text>
-
-            <TouchableOpacity
-              className="bg-black py-4 rounded-lg items-center mb-3"
-              onPress={() => {
-                handleCompleteSession();
-                startBreakSession();
-              }}
-            >
-              <Text className="text-white text-base font-medium">
-                START DEEP REST
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="py-3 rounded-lg items-center"
-              onPress={() => {
-                handleCompleteSession();
-              }}
-            >
-              <Text className="text-gray-800 text-base">END WORK SESSION</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -873,7 +1345,7 @@ export default function TimerScreen() {
             <Text className="text-2xl font-medium text-center mb-1">
               What did you do
             </Text>
-            <Text className="text-2xl font-medium italic text-center mb-6">
+            <Text className="text-2xl font-medium italic text-center mb-4">
               for Deep Rest
             </Text>
 
@@ -890,48 +1362,35 @@ export default function TimerScreen() {
 
             {/* Activity selection buttons */}
             {[
-              "SOMETHING ACTIVE",
-              "REFUELLED",
-              "SOMETHING MINDFUL",
-              "DOOM SCROLLED",
-            ].map((activity) => (
+              { label: "MOVEMENT", icon: "arrow-right" as const },
+              { label: "REFUEL", icon: "coffee" as const },
+              { label: "SOCIALIZING", icon: "users" as const },
+              { label: "MINDFULNESS", icon: "heart" as const },
+              { label: "SOCIAL MEDIA", icon: "mobile" as const },
+            ].map(({ label, icon }) => (
               <TouchableOpacity
-                key={activity}
+                key={label}
                 className={`py-3 px-4 mb-3 rounded-md ${
-                  selectedRestActivities.includes(activity)
+                  selectedRestActivity === label
                     ? "bg-gray-200 border border-gray-300"
                     : "bg-gray-100"
                 } flex-row justify-between items-center`}
-                onPress={() => toggleRestActivity(activity)}
+                onPress={() => handleRestActivitySubmit(label)}
               >
-                <Text className="text-base text-gray-800">{activity}</Text>
-                {selectedRestActivities.includes(activity) && (
+                <View className="flex-row items-center">
+                  <FontAwesome
+                    name={icon}
+                    size={16}
+                    color="#555"
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text className="text-base text-gray-800">{label}</Text>
+                </View>
+                {selectedRestActivity === label && (
                   <FontAwesome name="check" size={16} color="#666" />
                 )}
               </TouchableOpacity>
             ))}
-
-            <TouchableOpacity
-              className="bg-black py-4 rounded-lg items-center mt-4 mb-3"
-              onPress={() => {
-                handleCompleteBreakSession();
-                // Start another focus session
-                setShowStartModal(true);
-              }}
-            >
-              <Text className="text-white text-base font-medium">
-                START DEEP WORK
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="py-3 rounded-lg items-center"
-              onPress={() => {
-                handleCompleteBreakSession();
-              }}
-            >
-              <Text className="text-gray-800 text-base">END WORK SESSION</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>

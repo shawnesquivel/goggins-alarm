@@ -89,6 +89,7 @@ export const SessionService: SessionServiceInterface = {
       data: {
         id: sessionId,
         ...sessionData,
+        distraction_reasons_selected: sessionData.distraction_reasons_selected,
         last_updated_at: updatedSession.last_updated_at,
       },
       timestamp: Date.now(),
@@ -136,11 +137,9 @@ export const SessionService: SessionServiceInterface = {
       id,
       created_at: now,
       last_updated_at: now,
-      completed: false,
       actual_duration_minutes: null,
       ended_at: null,
       quality_rating: null,
-      distraction_reasons_selected: null,
       rest_activities_selected: null,
       user_notes: null,
     } as DbPeriod;
@@ -178,6 +177,22 @@ export const SessionService: SessionServiceInterface = {
       throw new Error(`Period not found: ${periodId}`);
     }
 
+    // Set work_time_completed for work periods with actual duration
+    if (
+      period.type === "work" &&
+      periodData.actual_duration_minutes !== undefined &&
+      periodData.actual_duration_minutes !== null
+    ) {
+      periodData.work_time_completed =
+        periodData.actual_duration_minutes >= period.planned_duration_minutes;
+
+      console.log(
+        "SessionService: Setting work_time_completed =",
+        periodData.work_time_completed,
+        `(${periodData.actual_duration_minutes} >= ${period.planned_duration_minutes})`
+      );
+    }
+
     // Update period data
     const updatedPeriod: DbPeriod = {
       ...period,
@@ -208,19 +223,21 @@ export const SessionService: SessionServiceInterface = {
       data: {
         id: periodId,
         ...periodData,
+        work_time_completed: updatedPeriod.work_time_completed,
         last_updated_at: updatedPeriod.last_updated_at,
         rest_activities_selected: periodData.rest_activities_selected || null,
       },
       timestamp: Date.now(),
     });
 
-    // Update session totals if period is completed
+    // Calculate session totals if period is completed
     if (
-      (periodData.completed || updatedPeriod.completed) &&
+      updatedPeriod.actual_duration_minutes != undefined &&
       updatedPeriod.session_id
     ) {
       await this.calculateSessionTotals(updatedPeriod.session_id);
     }
+
     return updatedPeriod;
   },
 
@@ -263,10 +280,8 @@ export const SessionService: SessionServiceInterface = {
       if (
         period.session_id === sessionId &&
         period.type === periodType &&
-        !period.completed
+        !period.ended_at
       ) {
-        // Mark as completed with actual duration being planned duration
-        period.completed = true;
         period.ended_at = new Date().toISOString();
         period.actual_duration_minutes = period.planned_duration_minutes;
         period.last_updated_at = new Date().toISOString();
@@ -512,7 +527,7 @@ export const SessionService: SessionServiceInterface = {
     total_deep_rest_minutes: number;
   }> {
     const sessionPeriods = await this.getSessionPeriods(sessionId);
-    const completedPeriods = sessionPeriods.filter((p) => p.completed);
+    const completedPeriods = sessionPeriods.filter((p) => p.ended_at !== null);
 
     let totalWorkSeconds = 0;
     let totalRestSeconds = 0;

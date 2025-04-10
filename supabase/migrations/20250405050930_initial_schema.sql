@@ -39,7 +39,9 @@ CREATE TABLE IF NOT EXISTS public.sessions (
   status TEXT CHECK (status IN ('not_started', 'in_progress', 'completed', 'cancelled')) DEFAULT 'not_started',
   cancelled_reason TEXT, -- Only if cancelled
   completed BOOLEAN DEFAULT false, -- Ref: 1.6.7.3 - Track completion status
-  user_notes TEXT -- Ref: 1.6.8.2 - Optional notes for the entire session
+  user_notes TEXT, -- Ref: 1.6.8.2 - Optional notes for the entire session
+  distraction_reasons_selected TEXT[], -- Ref: 1.6.1.3.1.2 - Reasons for ending early
+  cancelled_reasons TEXT[] -- Ref: 1.6.1.3.1.2 - Reasons for cancellation
 );
 
 -- Unified periods table for both work and rest
@@ -53,10 +55,8 @@ CREATE TABLE IF NOT EXISTS public.periods (
   started_at TIMESTAMP WITH TIME ZONE,
   ended_at TIMESTAMP WITH TIME ZONE,
   quality_rating INTEGER CHECK (quality_rating IS NULL OR (quality_rating BETWEEN 1 AND 5)), -- Ref: 1.6.1.3.2.1
-  distraction_reasons_selected TEXT[], -- Ref: 1.6.1.3.1.2 - Reasons for ending early
   rest_activities_selected TEXT[], -- Ref: 1.6.3.2 - Activities during rest
   user_notes TEXT, -- Ref: 1.6.3.4 - Notes about distractions or rest activities
-  completed BOOLEAN DEFAULT false,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   last_updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -83,53 +83,7 @@ CREATE TABLE IF NOT EXISTS public.revenuecat_errors (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
--- Create view for daily analytics
--- Ref: User_Workflow.md 2.2 - Daily summaries
-CREATE OR REPLACE VIEW public.daily_analytics AS
-SELECT 
-  user_id,
-  DATE(p.started_at) as day,
-  SUM(CASE WHEN p.type = 'work' THEN p.actual_duration_minutes ELSE 0 END) as total_work_minutes,
-  SUM(CASE WHEN p.type = 'rest' THEN p.actual_duration_minutes ELSE 0 END) as total_rest_minutes,
-  COUNT(CASE WHEN p.type = 'work' THEN 1 END) as work_periods_count,
-  AVG(CASE WHEN p.type = 'work' THEN p.quality_rating END) as avg_quality_rating,
-  array_agg(DISTINCT p.distraction_reasons_selected) FILTER (WHERE p.distraction_reasons_selected IS NOT NULL) as all_distraction_reasons
-FROM public.periods p
-JOIN public.sessions s ON p.session_id = s.id
-WHERE p.completed = true
-GROUP BY user_id, DATE(p.started_at);
 
--- Create view for weekly analytics
--- Ref: User_Workflow.md 2.2 - Weekly summaries
-CREATE OR REPLACE VIEW public.weekly_analytics AS
-SELECT 
-  user_id,
-  DATE_TRUNC('week', p.started_at) as week_start,
-  SUM(CASE WHEN p.type = 'work' THEN p.actual_duration_minutes ELSE 0 END) as total_work_minutes,
-  SUM(CASE WHEN p.type = 'rest' THEN p.actual_duration_minutes ELSE 0 END) as total_rest_minutes,
-  COUNT(CASE WHEN p.type = 'work' THEN 1 END) as work_periods_count,
-  AVG(CASE WHEN p.type = 'work' THEN p.quality_rating END) as avg_quality_rating,
-  array_agg(DISTINCT p.distraction_reasons_selected) FILTER (WHERE p.distraction_reasons_selected IS NOT NULL) as all_distraction_reasons
-FROM public.periods p
-JOIN public.sessions s ON p.session_id = s.id
-WHERE p.completed = true
-GROUP BY user_id, DATE_TRUNC('week', p.started_at);
-
--- Create view for monthly analytics
--- Ref: User_Workflow.md 2.2 - Monthly summaries
-CREATE OR REPLACE VIEW public.monthly_analytics AS
-SELECT 
-  user_id,
-  DATE_TRUNC('month', p.started_at) as month_start,
-  SUM(CASE WHEN p.type = 'work' THEN p.actual_duration_minutes ELSE 0 END) as total_work_minutes,
-  SUM(CASE WHEN p.type = 'rest' THEN p.actual_duration_minutes ELSE 0 END) as total_rest_minutes,
-  COUNT(CASE WHEN p.type = 'work' THEN 1 END) as work_periods_count,
-  AVG(CASE WHEN p.type = 'work' THEN p.quality_rating END) as avg_quality_rating,
-  array_agg(DISTINCT p.distraction_reasons_selected) FILTER (WHERE p.distraction_reasons_selected IS NOT NULL) as all_distraction_reasons
-FROM public.periods p
-JOIN public.sessions s ON p.session_id = s.id
-WHERE p.completed = true
-GROUP BY user_id, DATE_TRUNC('month', p.started_at);
 
 -- Create function to handle RevenueCat webhook data
 CREATE OR REPLACE FUNCTION public.handle_revenuecat_webhook(webhook_data JSONB)

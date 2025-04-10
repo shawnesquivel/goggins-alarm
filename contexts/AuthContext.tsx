@@ -29,7 +29,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.error("Error refreshing session:", error);
       } else {
-        console.log("Session refresh result:", !!data.session);
         setSession(data.session);
       }
     } catch (err) {

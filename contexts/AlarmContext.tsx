@@ -51,11 +51,6 @@ interface PomodoroContextType {
   startBreakSession: () => void;
   cancelSession: () => void;
 
-  // Tags
-  tags: Tag[];
-  addTag: (tag: Omit<Tag, "id">) => void;
-  deleteTag: (id: string) => void;
-
   // Settings
   settings: TimerSettings;
   updateSettings: (settings: TimerSettings) => void;
@@ -66,6 +61,17 @@ interface PomodoroContextType {
   getProjectStats: (
     projectId: string
   ) => Promise<{ totalSessions: number; totalMinutes: number }>;
+
+  // New more specific functions
+  completeWorkPeriod: (
+    rating?: number,
+    notes?: string,
+    startBreak?: boolean
+  ) => Promise<void>;
+  completeRestPeriod: (
+    activities?: string[],
+    startNewWork?: boolean
+  ) => Promise<void>;
 }
 
 // Default settings
@@ -76,24 +82,12 @@ const DEFAULT_SETTINGS: TimerSettings = {
   notificationsEnabled: true,
 };
 
-// Default tags
-const DEFAULT_TAGS: Tag[] = [
-  { id: "1", name: "Coding", color: "#4A90E2" },
-  { id: "2", name: "Planning", color: "#7ED321" },
-  { id: "3", name: "Marketing", color: "#F5A623" },
-  { id: "4", name: "Meeting", color: "#D0021B" },
-  { id: "5", name: "Education", color: "#9013FE" },
-  { id: "6", name: "Design", color: "#50E3C2" },
-  { id: "7", name: "Sales", color: "#BD10E0" },
-];
-
 const PomodoroContext = createContext<PomodoroContextType | undefined>(
   undefined
 );
 
 export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   // State
-  const [tags, setTags] = useState<Tag[]>(DEFAULT_TAGS);
   const [settings, setSettings] = useState<TimerSettings>(DEFAULT_SETTINGS);
   const [currentSession, setCurrentSession] = useState<PomodoroSession | null>(
     null
@@ -114,18 +108,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadSavedData = async () => {
       try {
-        // Load tags
-        const savedTags = await AsyncStorage.getItem(STORAGE_KEYS.TAGS);
-        if (savedTags) {
-          setTags(JSON.parse(savedTags));
-        } else {
-          // Save default tags if none exist
-          await AsyncStorage.setItem(
-            STORAGE_KEYS.TAGS,
-            JSON.stringify(DEFAULT_TAGS)
-          );
-        }
-
         // Load settings
         const savedSettings = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
         if (savedSettings) {
@@ -333,123 +315,159 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     // Future enhancement could be to track pause durations
   };
 
+  const completeWorkPeriod = async (
+    rating?: number,
+    notes?: string,
+    startBreak: boolean = false
+  ) => {
+    if (!currentSession || currentSession.type !== "focus") return;
+
+    stopTimer();
+    const currentPeriod = await SessionService.getCurrentPeriod();
+    if (!currentPeriod) {
+      console.warn("No current period found for work completion");
+      return;
+    }
+
+    // Calculate duration
+    const startTime = new Date(currentSession.startTime);
+    const endTime = new Date();
+    const actualSeconds = Math.floor(
+      (endTime.getTime() - startTime.getTime()) / 1000
+    );
+
+    // Update work period
+    await SessionService.updatePeriod(currentPeriod.id, {
+      actual_duration_minutes: actualSeconds / 60,
+      ended_at: endTime.toISOString(),
+      quality_rating: rating || null,
+      user_notes: notes || null,
+    });
+
+    // Only complete session if not transitioning to break
+    if (!startBreak) {
+      await SessionService.updateSession(currentSession.id, {
+        status: "completed",
+        user_notes: notes || null,
+      });
+
+      // Clean up UI state
+      setCurrentSession(null);
+      await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+    }
+
+    // UI state update
+    setTimerStatus(TimerStatus.IDLE);
+
+    // Only clear current period if not transitioning to break
+    if (!startBreak) {
+      await SessionService.setCurrentPeriod(null);
+    }
+
+    // Force sync to Supabase
+    await SessionService.syncToSupabase();
+
+    // Start break if requested
+    if (startBreak) {
+      await startBreakSession();
+    }
+  };
+
+  const completeRestPeriod = async (
+    activities?: string[],
+    startNewWork: boolean = false
+  ) => {
+    if (!currentSession || currentSession.type !== "break") return;
+
+    stopTimer();
+    const currentPeriod = await SessionService.getCurrentPeriod();
+    if (!currentPeriod) {
+      console.warn("No current period found for rest completion");
+      return;
+    }
+
+    // Calculate duration
+    const startTime = new Date(currentSession.startTime);
+    const endTime = new Date();
+    const actualSeconds = Math.floor(
+      (endTime.getTime() - startTime.getTime()) / 1000
+    );
+
+    // Update rest period
+    await SessionService.updatePeriod(currentPeriod.id, {
+      actual_duration_minutes: actualSeconds / 60,
+      ended_at: endTime.toISOString(),
+      rest_activities_selected: activities || null,
+    });
+
+    // Force sync to Supabase
+    await SessionService.syncToSupabase();
+
+    // Save current session info before transitioning
+    const sessionId = currentSession.id;
+    const projectId = currentSession.projectId;
+
+    // Get the task description from the database session record
+    const dbSession = await SessionService.getSession(sessionId);
+    const taskDescription = dbSession?.task || "Couldn't Find Task Description"; // TODO: Remove for production
+
+    // Clear the current period to prepare for the next one
+    await SessionService.setCurrentPeriod(null);
+
+    // If startNewWork is true, immediately start the next work period
+    if (startNewWork) {
+      await startNextWorkPeriod(sessionId, projectId, taskDescription);
+    }
+  };
+
+  // Keep for backward compatibility, but simplified
   const completeSession = async (
     rating?: number,
     notes?: string,
     transitionToBreak: boolean = false,
     breakActivities?: string[]
   ) => {
-    console.log("AlarmContext: Completing session", {
-      sessionId: currentSession?.id,
-      rating,
-      notesLength: notes?.length || 0,
-      transitionToBreak,
-      breakActivities,
-    });
-
     if (!currentSession) return;
 
-    stopTimer();
-
-    // Get the current period from SessionService
-    const currentPeriod = await SessionService.getCurrentPeriod();
-
-    if (currentPeriod) {
-      console.log("AlarmContext: Found current period", currentPeriod.id);
-
-      // Calculate actual duration including overtime
-      const startTime = new Date(currentSession.startTime);
-      const endTime = new Date();
-      const actualSeconds = Math.floor(
-        (endTime.getTime() - startTime.getTime()) / 1000
-      );
-      const plannedSeconds = currentSession.duration * 60;
-
-      console.log("AlarmContext: Duration calculation", {
-        planned: plannedSeconds,
-        actual: actualSeconds,
-        overtime: actualSeconds - plannedSeconds,
-        startTime: startTime.toISOString(),
-        endTime: endTime.toISOString(),
-        isOvertime: isOvertimeRef.current,
-      });
-
-      // Complete the period with different fields based on session type
-      const periodUpdate = {
-        actual_duration_minutes: actualSeconds / 60,
-        ended_at: endTime.toISOString(),
-        completed: true,
-      };
-
-      if (currentSession.type === "focus") {
-        // For focus sessions, include rating and notes
-        Object.assign(periodUpdate, {
-          quality_rating: rating || null,
-          user_notes: notes || null,
-        });
-      } else if (currentSession.type === "break") {
-        // For break sessions, include activities
-        Object.assign(periodUpdate, {
-          rest_activities_selected: breakActivities || null,
-        });
-      }
-
-      await SessionService.updatePeriod(currentPeriod.id, periodUpdate);
-
-      // Update session
-      await SessionService.updateSession(currentSession.id, {
-        status: "completed",
-        completed: true,
-        user_notes: notes || null,
-      });
-
-      console.log("AlarmContext: Updated session status to completed");
-
-      // Force sync to Supabase
-      await SessionService.syncToSupabase();
-    } else {
-      console.warn(
-        "AlarmContext: No current period found when completing session"
-      );
-    }
-
-    // Store the current session data before clearing it
-    const completedSession = currentSession;
-
-    // UI state updates
-    setCurrentSession(null);
-    setTimerStatus(TimerStatus.IDLE);
-    await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
-
-    // Clear current period in SessionService
-    await SessionService.setCurrentPeriod(null);
-
-    // If we're transitioning to a break session, start it now
-    if (transitionToBreak) {
-      console.log("AlarmContext: Transitioning to break session");
-      await startBreakSession();
+    if (currentSession.type === "focus") {
+      await completeWorkPeriod(rating, notes, transitionToBreak);
+    } else if (currentSession.type === "break") {
+      await completeRestPeriod(breakActivities);
     }
   };
 
   const startBreakSession = async () => {
+    const currentPeriod = await SessionService.getCurrentPeriod();
+    if (
+      currentPeriod &&
+      currentPeriod.type === "rest" &&
+      currentSession?.id === currentPeriod.session_id
+    ) {
+      console.log("[AlarmContext]: Rest period already exists, skipping");
+      return;
+    }
+
     if (currentSession && currentSession.type === "break") return;
 
-    // Reset all session state
+    // Reset state
     isOvertimeRef.current = false;
     setIsOvertime(false);
     setNextBreakDuration(null);
 
-    // Clear any existing period/session first to avoid duplicates
+    // Clear any existing period first to avoid duplicates
     await SessionService.setCurrentPeriod(null);
 
     // Use custom break duration if set, otherwise use from settings
     const breakDuration =
       nextBreakDuration !== null ? nextBreakDuration : settings.breakDuration;
 
-    // Create new break session
+    // Use existing session ID if available
+    const sessionId = currentSession?.id || uuidv4();
+
+    // Create a representation of break period for UI state - preserve original task description
     const newSession: PomodoroSession = {
-      id: uuidv4(),
-      taskDescription: "Break",
+      id: sessionId, // Reuse session ID
+      taskDescription: currentSession?.taskDescription || "", // Preserve original task description
       projectId: currentSession?.projectId || "break",
       startTime: new Date(),
       duration: breakDuration,
@@ -459,35 +477,22 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     };
 
     try {
-      // Create new break session in DB or update existing session
-      // For simplicity in MVP, we'll create a new session for breaks too
-      await SessionService.createSession({
-        id: newSession.id,
-        task: "Break",
-        project_id: newSession.projectId,
-        status: "in_progress",
-      });
-
-      console.log("AlarmContext: Created break session in DB", newSession.id);
-
-      // Create rest period
       await SessionService.createPeriod({
-        session_id: newSession.id,
+        session_id: sessionId,
         type: "rest",
         planned_duration_minutes: breakDuration,
         started_at: new Date().toISOString(),
       });
-
-      console.log("AlarmContext: Created rest period in DB");
     } catch (error) {
-      console.error("AlarmContext: Error creating break session in DB:", error);
+      console.error("Error creating break period:", error);
     }
 
+    // Update UI state
     setCurrentSession(newSession);
     setRemainingSeconds(breakDuration * 60);
     setTimerStatus(TimerStatus.RUNNING);
 
-    // Save current session
+    // Save current session state
     AsyncStorage.setItem(
       STORAGE_KEYS.CURRENT_SESSION,
       JSON.stringify(newSession)
@@ -495,28 +500,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
 
     // Start timer
     startTimer();
-  };
-
-  // Tag management
-  const addTag = async (tagData: Omit<Tag, "id">) => {
-    const newTag: Tag = {
-      ...tagData,
-      id: Date.now().toString(),
-    };
-
-    const updatedTags = [...tags, newTag];
-    setTags(updatedTags);
-
-    // Save to storage
-    await AsyncStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(updatedTags));
-  };
-
-  const deleteTag = async (id: string) => {
-    const updatedTags = tags.filter((tag) => tag.id !== id);
-    setTags(updatedTags);
-
-    // Save to storage
-    await AsyncStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(updatedTags));
   };
 
   // Settings management
@@ -614,6 +597,76 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     await SessionService.setCurrentPeriod(null);
   };
 
+  // New function to start the next work period in the same session
+  const startNextWorkPeriod = async (
+    sessionId: string,
+    projectId: string,
+    taskDescription: string,
+    customDuration?: number
+  ) => {
+    console.log(
+      "AlarmContext: Starting next work period in session",
+      sessionId
+    );
+
+    // Reset overtime state
+    isOvertimeRef.current = false;
+    setIsOvertime(false);
+
+    // Use default focus duration if none specified
+    const duration =
+      customDuration !== undefined ? customDuration : settings.focusDuration;
+
+    // Create a work session with the same session ID
+    const workSession: PomodoroSession = {
+      id: sessionId, // Reuse the same session ID
+      taskDescription,
+      projectId,
+      startTime: new Date(),
+      duration: duration,
+      isCompleted: false,
+      tags: [],
+      type: "focus",
+    };
+
+    try {
+      // Update the session status back to in_progress if needed
+      await SessionService.updateSession(sessionId, {
+        status: "in_progress",
+      });
+
+      // Create a new work period linked to the same session
+      await SessionService.createPeriod({
+        session_id: sessionId,
+        type: "work",
+        planned_duration_minutes: duration,
+        started_at: new Date().toISOString(),
+      });
+
+      console.log(
+        "AlarmContext: Created new work period in session",
+        sessionId
+      );
+    } catch (error) {
+      console.error("Error starting next work period:", error);
+      // Continue anyway - we want UI to work even if DB fails
+    }
+
+    // Update UI state
+    setCurrentSession(workSession);
+    setRemainingSeconds(Math.round(duration * 60));
+    setTimerStatus(TimerStatus.RUNNING);
+
+    // Save current session to AsyncStorage
+    await AsyncStorage.setItem(
+      STORAGE_KEYS.CURRENT_SESSION,
+      JSON.stringify(workSession)
+    );
+
+    // Start the timer
+    startTimer();
+  };
+
   return (
     <PomodoroContext.Provider
       value={{
@@ -631,11 +684,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         startBreakSession,
         cancelSession: handleCancelSession,
 
-        // Tags
-        tags,
-        addTag,
-        deleteTag,
-
         // Settings
         settings,
         updateSettings,
@@ -644,6 +692,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         getSessionHistory,
         getTotalFocusTime,
         getProjectStats,
+
+        // New more specific functions
+        completeWorkPeriod,
+        completeRestPeriod,
       }}
     >
       {children}

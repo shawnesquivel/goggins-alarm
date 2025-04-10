@@ -64,10 +64,7 @@ BEGIN
       'users',
       'projects',
       'sessions',
-      'periods',
-      'daily_analytics',
-      'weekly_analytics',
-      'monthly_analytics'
+      'periods'
     ],
     'missing_tables', (
       SELECT array_agg(t)
@@ -75,10 +72,7 @@ BEGIN
         'users',
         'projects',
         'sessions',
-        'periods',
-        'daily_analytics',
-        'weekly_analytics',
-        'monthly_analytics'
+        'periods'
       ]) AS t
       WHERE t NOT IN (
         SELECT tablename

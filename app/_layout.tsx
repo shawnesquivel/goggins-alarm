@@ -6,7 +6,7 @@ import {
 import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import "react-native-reanimated";
 import "../global.css";
 import { useColorScheme } from "@/components/useColorScheme";
@@ -23,6 +23,9 @@ import {
 } from "@expo-google-fonts/libre-baskerville";
 import { LibreCaslonText_400Regular } from "@expo-google-fonts/libre-caslon-text";
 import { ProjectProvider } from "@/contexts/ProjectContext";
+import { View, Text } from "react-native";
+import { checkConnection } from "@/lib/supabase";
+import { MaterialIcons } from "@expo/vector-icons";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -36,6 +39,19 @@ export const unstable_settings = {
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
+const OfflineIndicator = () => (
+  <View className="bg-gray-100/90 py-1 flex flex-row items-center justify-center">
+    <MaterialIcons
+      name="cloud-off"
+      size={12}
+      color="#4B5563"
+      className="mr-1"
+    />
+    <Text className="text-gray-600 text-xs">
+      Offline - Changes will sync when online
+    </Text>
+  </View>
+);
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -46,11 +62,30 @@ export default function RootLayout() {
     LibreCaslonText_400Regular,
   });
 
+  const [isConnected, setIsConnected] = useState(true);
+
   useEffect(() => {
     if (fontsLoaded) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded]);
+
+  useEffect(() => {
+    const checkSupabaseConnection = async () => {
+      try {
+        const connected = await checkConnection();
+        setIsConnected(connected);
+        if (!connected) {
+          console.log("Supabase connection failed - entering offline mode");
+        }
+      } catch (error) {
+        console.log("Error checking connection:", error);
+        setIsConnected(false);
+      }
+    };
+
+    checkSupabaseConnection();
+  }, []);
 
   if (!fontsLoaded) {
     return null;
@@ -63,6 +98,7 @@ export default function RootLayout() {
       <OnboardingProvider>
         <ProjectProvider>
           <PomodoroProvider>
+            {!isConnected && <OfflineIndicator />}
             <RootLayoutNav />
           </PomodoroProvider>
         </ProjectProvider>
