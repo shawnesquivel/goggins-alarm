@@ -56,9 +56,9 @@ export default function TimerScreen() {
   const [sessionNotes, setSessionNotes] = useState("");
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
   const [starRating, setStarRating] = useState<number | null>(null);
-  const [selectedRestActivities, setSelectedRestActivities] = useState<
-    string[]
-  >([]);
+  const [selectedRestActivity, setSelectedRestActivity] = useState<
+    string | null
+  >(null);
   const [selectedBreakActivities, setSelectedBreakActivities] = useState<
     string[]
   >([]);
@@ -158,6 +158,72 @@ export default function TimerScreen() {
     }
   };
 
+  // Define a function that handles both selection and submission
+  const handleRestActivitySubmit = (activity: string) => {
+    // First set the selected activity (for UI feedback)
+    setSelectedRestActivity(activity);
+
+    // Then immediately submit with the directly passed activity
+    submitRestPeriodWithActivity(activity);
+  };
+
+  // New function that takes activity as a parameter to avoid race conditions
+  const submitRestPeriodWithActivity = async (activity: string) => {
+    if (!currentSession) return;
+
+    try {
+      // Get the current period and session from DB to check latest state
+      const currentPeriod = await SessionService.getCurrentPeriod();
+      const dbSession = await SessionService.getSession(currentSession.id);
+
+      // Check if session is already completed or cancelled
+      if (!currentPeriod || !dbSession) {
+        console.log("Session or period not found, already cleaned up");
+        setShowBreakRatingModal(false);
+        return;
+      }
+
+      if (
+        dbSession.status === "completed" ||
+        dbSession.status === "cancelled"
+      ) {
+        console.log("Session already", dbSession.status);
+        setShowBreakRatingModal(false);
+        return;
+      }
+
+      // Calculate actual duration up to now
+      const startTime = new Date(currentSession.startTime);
+      const endTime = new Date();
+      const actualSeconds = Math.floor(
+        (endTime.getTime() - startTime.getTime()) / 1000
+      );
+
+      // Keep as array with single element to match DB schema
+      const activityArray = [activity];
+
+      // Update period with rest activity
+      await SessionService.updatePeriod(currentPeriod.id, {
+        actual_duration_minutes: actualSeconds / 60,
+        ended_at: new Date().toISOString(),
+        rest_activities_selected: activityArray, // Single element array
+      });
+
+      // Close modal and clean up state
+      setShowBreakRatingModal(false);
+      setSelectedRestActivity(null);
+
+      // Start new work session - pass activity as array
+      completeRestPeriod(activityArray, true);
+      setShowStartModal(true);
+    } catch (error) {
+      console.error("Error updating session for rest reflection:", error);
+      // Clean up UI state even if DB update fails
+      setShowBreakRatingModal(false);
+      setSelectedRestActivity(null);
+    }
+  };
+
   // Update the handler for break session completion
   const handleSubmitRestPeriodReflection = async () => {
     if (!currentSession) return;
@@ -194,86 +260,37 @@ export default function TimerScreen() {
       await SessionService.updatePeriod(currentPeriod.id, {
         actual_duration_minutes: actualSeconds / 60,
         ended_at: new Date().toISOString(),
-        rest_activities_selected: selectedRestActivities,
+        rest_activities_selected: selectedRestActivity
+          ? [selectedRestActivity]
+          : [],
       });
 
       // Close modal and clean up state
       setShowBreakRatingModal(false);
-      setSelectedRestActivities([]);
+      setSelectedRestActivity(null);
 
       // Start new work session
-      completeRestPeriod(selectedRestActivities, true);
+      completeRestPeriod(
+        selectedRestActivity ? [selectedRestActivity] : [],
+        true
+      );
       setShowStartModal(true);
     } catch (error) {
       console.error("Error updating session for rest reflection:", error);
       // Clean up UI state even if DB update fails
       setShowBreakRatingModal(false);
-      setSelectedRestActivities([]);
+      setSelectedRestActivity(null);
     }
   };
 
-  // Add handler for skipping rest period reflection
-  const handleSkipRestPeriodReflection = async () => {
-    if (!currentSession) return;
-
-    try {
-      // Get the current period and session from DB to check latest state
-      const currentPeriod = await SessionService.getCurrentPeriod();
-      const dbSession = await SessionService.getSession(currentSession.id);
-
-      // Check if session is already completed or cancelled
-      if (!currentPeriod || !dbSession) {
-        console.log("Session or period not found, already cleaned up");
-        setShowBreakRatingModal(false);
-        return;
-      }
-
-      if (
-        dbSession.status === "completed" ||
-        dbSession.status === "cancelled"
-      ) {
-        console.log("Session already", dbSession.status);
-        setShowBreakRatingModal(false);
-        return;
-      }
-
-      // Calculate actual duration up to now
-      const startTime = new Date(currentSession.startTime);
-      const endTime = new Date();
-      const actualSeconds = Math.floor(
-        (endTime.getTime() - startTime.getTime()) / 1000
-      );
-
-      // Update period with empty rest activities
-      await SessionService.updatePeriod(currentPeriod.id, {
-        actual_duration_minutes: actualSeconds / 60,
-        ended_at: new Date().toISOString(),
-        rest_activities_selected: [],
-      });
-
-      // Close modal and clean up state
-      setShowBreakRatingModal(false);
-      setSelectedRestActivities([]);
-
-      // Start new work session
-      completeRestPeriod([], true);
-      setShowStartModal(true);
-    } catch (error) {
-      console.error("Error updating session for skip rest reflection:", error);
-      // Clean up UI state even if DB update fails
-      setShowBreakRatingModal(false);
-      setSelectedRestActivities([]);
-    }
-  };
-
-  // Toggle selected activity
-  const toggleRestActivity = (activity: string) => {
-    if (selectedRestActivities.includes(activity)) {
-      setSelectedRestActivities(
-        selectedRestActivities.filter((a) => a !== activity)
-      );
+  // Replace the toggle function with a simpler select/deselect function
+  const selectRestActivity = (activity: string) => {
+    // If already selected, deselect it (toggle behavior)
+    if (selectedRestActivity === activity) {
+      setSelectedRestActivity(null);
     } else {
-      setSelectedRestActivities([...selectedRestActivities, activity]);
+      // Otherwise select the new activity
+      setSelectedRestActivity(activity);
     }
   };
 
@@ -1120,43 +1137,35 @@ export default function TimerScreen() {
 
             {/* Activity selection buttons */}
             {[
-              "SOMETHING ACTIVE",
-              "REFUELLED",
-              "SOMETHING MINDFUL",
-              "DOOM SCROLLED",
-            ].map((activity) => (
+              { label: "MOVEMENT", icon: "arrow-right" as const },
+              { label: "REFUEL", icon: "coffee" as const },
+              { label: "SOCIALIZING", icon: "users" as const },
+              { label: "MINDFULNESS", icon: "heart" as const },
+              { label: "SOCIAL MEDIA", icon: "mobile" as const },
+            ].map(({ label, icon }) => (
               <TouchableOpacity
-                key={activity}
+                key={label}
                 className={`py-3 px-4 mb-3 rounded-md ${
-                  selectedRestActivities.includes(activity)
+                  selectedRestActivity === label
                     ? "bg-gray-200 border border-gray-300"
                     : "bg-gray-100"
                 } flex-row justify-between items-center`}
-                onPress={() => toggleRestActivity(activity)}
+                onPress={() => handleRestActivitySubmit(label)}
               >
-                <Text className="text-base text-gray-800">{activity}</Text>
-                {selectedRestActivities.includes(activity) && (
+                <View className="flex-row items-center">
+                  <FontAwesome
+                    name={icon}
+                    size={16}
+                    color="#555"
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text className="text-base text-gray-800">{label}</Text>
+                </View>
+                {selectedRestActivity === label && (
                   <FontAwesome name="check" size={16} color="#666" />
                 )}
               </TouchableOpacity>
             ))}
-
-            <TouchableOpacity
-              className="bg-black py-4 rounded-lg items-center mt-4 mb-3"
-              onPress={handleSubmitRestPeriodReflection}
-            >
-              <Text className="text-white text-base font-medium">
-                START DEEP WORK
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="py-3 rounded-lg items-center"
-              onPress={handleSkipRestPeriodReflection}
-            >
-              {/* Finish Break */}
-              <Text className="text-gray-800 text-base">SKIP</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
