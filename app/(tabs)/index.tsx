@@ -95,8 +95,15 @@ export default function TimerScreen() {
     return `${isOvertime ? "+" : ""}${timeString}`;
   };
 
-  // Update the handler for work period completion
-  const handleSubmitWorkPeriodReflection = async () => {
+  // First, create a new handler function that takes the rating as a parameter
+  const handleSubmitWithRating = (rating: number) => {
+    setStarRating(rating);
+    // Pass the rating directly to avoid race condition
+    handleSubmitWorkPeriodReflectionWithRating(rating);
+  };
+
+  // Modified submission function that takes the rating parameter
+  const handleSubmitWorkPeriodReflectionWithRating = async (rating: number) => {
     if (!currentSession) return;
 
     try {
@@ -127,11 +134,11 @@ export default function TimerScreen() {
         (endTime.getTime() - startTime.getTime()) / 1000
       );
 
-      // Update period with rating data
+      // Use the direct rating parameter instead of state
       await SessionService.updatePeriod(currentPeriod.id, {
         actual_duration_minutes: actualSeconds / 60,
         ended_at: new Date().toISOString(),
-        quality_rating: starRating ?? null,
+        quality_rating: rating,
         user_notes: sessionNotes || null,
       });
 
@@ -140,66 +147,10 @@ export default function TimerScreen() {
       setStarRating(null);
       setSessionNotes("");
 
-      // Start rest period as normal
-      completeWorkPeriod(starRating ?? undefined, sessionNotes, true);
+      // Start rest period as normal, passing the rating directly
+      completeWorkPeriod(rating, sessionNotes, true);
     } catch (error) {
       console.error("Error updating session for work reflection:", error);
-      // Clean up UI state even if DB update fails
-      setShowRatingModal(false);
-      setStarRating(null);
-      setSessionNotes("");
-    }
-  };
-
-  // Add handler for skipping work period reflection
-  const handleSkipWorkPeriodReflection = async () => {
-    if (!currentSession) return;
-
-    try {
-      // Get the current period and session from DB to check latest state
-      const currentPeriod = await SessionService.getCurrentPeriod();
-      const dbSession = await SessionService.getSession(currentSession.id);
-
-      // Check if session is already completed or cancelled
-      if (!currentPeriod || !dbSession) {
-        console.log("Session or period not found, already cleaned up");
-        setShowRatingModal(false);
-        return;
-      }
-
-      if (
-        dbSession.status === "completed" ||
-        dbSession.status === "cancelled"
-      ) {
-        console.log("Session already", dbSession.status);
-        setShowRatingModal(false);
-        return;
-      }
-
-      // Calculate actual duration up to now
-      const startTime = new Date(currentSession.startTime);
-      const endTime = new Date();
-      const actualSeconds = Math.floor(
-        (endTime.getTime() - startTime.getTime()) / 1000
-      );
-
-      // Update period with null rating
-      await SessionService.updatePeriod(currentPeriod.id, {
-        actual_duration_minutes: actualSeconds / 60,
-        ended_at: new Date().toISOString(),
-        quality_rating: null,
-        user_notes: null,
-      });
-
-      // Close rating modal and clean up state
-      setShowRatingModal(false);
-      setStarRating(null);
-      setSessionNotes("");
-
-      // Start rest period as normal
-      completeWorkPeriod(undefined, "", true);
-    } catch (error) {
-      console.error("Error updating session for skip work reflection:", error);
       // Clean up UI state even if DB update fails
       setShowRatingModal(false);
       setStarRating(null);
@@ -1090,6 +1041,16 @@ export default function TimerScreen() {
       >
         <View className="flex-1 bg-white justify-center items-center">
           <View className="w-full max-w-[400px] px-8">
+            {/* Change to back arrow in top left corner */}
+            <View className="absolute left-4 top-4">
+              <TouchableOpacity
+                onPress={() => setShowRatingModal(false)}
+                className="p-2"
+              >
+                <FontAwesome name="chevron-left" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
             <Text className="text-4xl text-center mb-1">Rate your</Text>
             <Text className="text-4xl italic text-center mb-8">Deep Work</Text>
 
@@ -1103,7 +1064,7 @@ export default function TimerScreen() {
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity
                   key={star}
-                  onPress={() => setStarRating(star)}
+                  onPress={() => handleSubmitWithRating(star)}
                   className="mx-2"
                 >
                   <FontAwesome
@@ -1126,23 +1087,6 @@ export default function TimerScreen() {
                 : 0}
               :50
             </Text>
-
-            <TouchableOpacity
-              className="bg-black py-4 rounded-lg items-center mb-3"
-              onPress={handleSubmitWorkPeriodReflection}
-            >
-              <Text className="text-white text-base font-medium">SUBMIT</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              className="py-3 items-center"
-              onPress={() => {
-                setStarRating(null);
-                handleSkipWorkPeriodReflection();
-              }}
-            >
-              <Text className="text-gray-600 text-base">SKIP</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
