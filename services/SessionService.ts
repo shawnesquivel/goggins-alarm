@@ -384,24 +384,19 @@ export const SessionService: SessionServiceInterface = {
         try {
           if (op.type === "insert_session") {
             const sessionData = op.data as DbSessionInsert;
-
-            // Add user_id
-            const sessionWithUser = {
-              ...sessionData,
-              user_id: user.id,
-            };
+            const sessionWithUser = { ...sessionData, user_id: user.id };
 
             console.log(
-              "SessionService: Inserting session to Supabase",
+              "SessionService: Upserting session to Supabase",
               sessionWithUser.id
             );
 
             const { error } = await supabase
               .from("sessions")
-              .insert(sessionWithUser);
+              .upsert(sessionWithUser, { onConflict: "id" });
 
             if (error) {
-              console.error("Error inserting session:", error);
+              console.error("Error upserting session:", error);
               continue;
             }
           } else if (op.type === "update_session") {
@@ -425,14 +420,16 @@ export const SessionService: SessionServiceInterface = {
             const periodData = op.data as DbPeriodInsert;
 
             console.log(
-              "SessionService: Inserting period to Supabase",
+              "SessionService: Upserting period to Supabase",
               periodData.id
             );
 
-            const { error } = await supabase.from("periods").insert(periodData);
+            const { error } = await supabase
+              .from("periods")
+              .upsert(periodData, { onConflict: "id" });
 
             if (error) {
-              console.error("Error inserting period:", error);
+              console.error("Error upserting period:", error);
               continue;
             }
           } else if (op.type === "update_period") {
