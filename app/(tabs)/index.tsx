@@ -23,7 +23,10 @@ import { format } from "date-fns";
 import { ExportModal } from "@/components/shared/modals/ExportModal";
 import { HeaderRight } from "@/components/shared/HeaderRight";
 import { SessionService } from "@/services/SessionService";
-import { useAnalytics } from "@/app/hooks/useAnalytics";
+import useAnalytics from "@/app/hooks/useAnalytics";
+import { RestActivityRatingModal } from "@/components/cycle/RestActivityRatingModal";
+import { SESSION_STORAGE_KEYS } from "@/types/session";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function TimerScreen() {
   const router = useRouter();
@@ -44,6 +47,7 @@ export default function TimerScreen() {
   });
 
   // Local state
+  const [error, setError] = useState("");
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [showStartModal, setShowStartModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
@@ -102,11 +106,11 @@ export default function TimerScreen() {
     calculateTimes();
   }, [cancelFlowStep, currentSession?.id]);
 
-  useEffect(() => {
-    if (currentSession) {
-      handleRefresh();
-    }
-  }, [currentSession]);
+  // useEffect(() => {
+  //   if (currentSession) {
+  //     handleRefresh();
+  //   }
+  // }, [currentSession]);
 
   // Add export ref
   const exportRef = useRef({
@@ -176,12 +180,19 @@ export default function TimerScreen() {
       );
 
       // Use the direct rating parameter instead of state
-      await SessionService.updatePeriod(currentPeriod.id, {
-        actual_duration_minutes: actualSeconds / 60,
-        ended_at: new Date().toISOString(),
-        quality_rating: rating,
-        user_notes: sessionNotes || null,
-      });
+      console.log(
+        "Updating period from handleSubmitWorkPeriodReflectionWithRating"
+      );
+      await SessionService.updatePeriod(
+        currentPeriod.id,
+        {
+          actual_duration_minutes: actualSeconds / 60,
+          ended_at: new Date().toISOString(),
+          quality_rating: rating,
+          user_notes: sessionNotes || null,
+        },
+        true
+      );
 
       // Close rating modal and clean up state
       setShowRatingModal(false);
@@ -199,15 +210,7 @@ export default function TimerScreen() {
     }
   };
 
-  // Define a function that handles both selection and submission
-  const handleRestActivitySubmit = (activity: string) => {
-    // First set the selected activity (for UI feedback)
-    setSelectedRestActivity(activity);
-
-    // Then immediately submit with the directly passed activity
-    submitRestPeriodWithActivity(activity);
-  };
-
+  // Modified rest period submission for normal flow - will auto-start next work
   const submitRestPeriodWithActivity = async (activity: string) => {
     if (!currentSession) return;
 
@@ -243,19 +246,23 @@ export default function TimerScreen() {
       const activityArray = [activity];
 
       // Update period with rest activity
-      await SessionService.updatePeriod(currentPeriod.id, {
-        actual_duration_minutes: actualSeconds / 60,
-        ended_at: new Date().toISOString(),
-        rest_activities_selected: activityArray, // Single element array
-      });
+      console.log("Updating period from submitRestPeriodWithActivity");
+      await SessionService.updatePeriod(
+        currentPeriod.id,
+        {
+          actual_duration_minutes: actualSeconds / 60,
+          ended_at: new Date().toISOString(),
+          rest_activities_selected: activityArray, // Single element array
+        },
+        true
+      );
 
       // Close modal and clean up state
       setShowBreakRatingModal(false);
       setSelectedRestActivity(null);
 
-      // Complete rest period and continue to next work period
-      // Note: This assumes we'll modify AlarmContext's completeRestPeriod
-      // to automatically start the next work period
+      // Complete rest period and CONTINUE to next work period
+      // Normal flow - always start next work period
       completeRestPeriod(activityArray, true);
     } catch (error) {
       console.error("Error updating session for rest reflection:", error);
@@ -263,6 +270,53 @@ export default function TimerScreen() {
       setShowBreakRatingModal(false);
       setSelectedRestActivity(null);
     }
+  };
+
+  // UPDATED function for cancel flow - will NOT auto-start next work period
+  const handleCancelFlowRestRating = async (activity: string) => {
+    if (!currentSession) return;
+
+    // Capture current value to avoid race conditions
+    setSelectedRestActivity(activity);
+
+    try {
+      // Get the current period and session
+      const currentPeriod = await SessionService.getCurrentPeriod();
+      const dbSession = await SessionService.getSession(currentSession.id);
+
+      if (currentPeriod && dbSession) {
+        // Calculate actual duration
+        const startTime = new Date(currentSession.startTime);
+        const endTime = new Date();
+        const actualSeconds = Math.floor(
+          (endTime.getTime() - startTime.getTime()) / 1000
+        );
+
+        // Keep as array with single element to match DB schema
+        const activityArray = [activity];
+
+        // Update period with duration and activity
+        console.log("Updating period from handleCancelFlowRestRating");
+        await SessionService.updatePeriod(
+          currentPeriod.id,
+          {
+            actual_duration_minutes: actualSeconds / 60,
+            ended_at: new Date().toISOString(),
+            rest_activities_selected: activityArray,
+          },
+          true
+        );
+
+        // For the cancel flow, we DO NOT call completeRestPeriod with startNewWork=true
+        // Instead we just handle the UI update without starting a new work period
+        await completeRestPeriod(activityArray, false);
+      }
+    } catch (error) {
+      console.error("Error updating rest period for cancel flow:", error);
+    }
+
+    // Move to reflection step
+    setCancelFlowStep(CancelFlowStep.REFLECT);
   };
 
   // Update existing handler
@@ -296,177 +350,174 @@ export default function TimerScreen() {
     );
   };
 
-  // Update to accept direct parameter
-  const handleSubmitReflection = async (selectedReason?: string) => {
-    if (!currentSession) return;
+  // // Update to accept direct parameter
+  // const handleSubmitReflection = async (selectedReason?: string) => {
+  //   if (!currentSession) return;
 
-    // Capture current state values to avoid race conditions
-    const currentRating = starRating;
-    const currentActivity = selectedRestActivity;
-    const currentTaskComplete = isTaskComplete;
+  //   // Capture current state values to avoid race conditions
+  //   const currentRating = starRating;
+  //   const currentActivity = selectedRestActivity;
+  //   const currentTaskComplete = isTaskComplete;
 
-    // Use directly passed reason if provided, otherwise use state
-    const currentReasons = selectedReason
-      ? [selectedReason]
-      : [...selectedReasons];
+  //   // Use directly passed reason if provided, otherwise use state
+  //   const currentReasons = selectedReason
+  //     ? [selectedReason]
+  //     : [...selectedReasons];
 
-    try {
-      // Get the current period and session from DB to check latest state
-      const currentPeriod = await SessionService.getCurrentPeriod();
-      const dbSession = await SessionService.getSession(currentSession.id);
+  //   try {
+  //     // Get the current period and session from DB to check latest state
+  //     const currentPeriod = await SessionService.getCurrentPeriod();
+  //     const dbSession = await SessionService.getSession(currentSession.id);
 
-      // Check if session is already completed or cancelled
-      if (!currentPeriod || !dbSession) {
-        console.log("Session or period not found, already cleaned up");
-        setCancelFlowStep(CancelFlowStep.NONE);
-        setSelectedReasons([]);
-        setStarRating(null);
-        setSelectedRestActivity(null);
-        return;
-      }
+  //     // Check if session is already completed or cancelled
+  //     if (!currentPeriod || !dbSession) {
+  //       console.log("Session or period not found, already cleaned up");
+  //       setCancelFlowStep(CancelFlowStep.NONE);
+  //       setSelectedReasons([]);
+  //       setStarRating(null);
+  //       setSelectedRestActivity(null);
+  //       return;
+  //     }
 
-      if (
-        dbSession.status === "completed" ||
-        dbSession.status === "cancelled"
-      ) {
-        console.log("Session already", dbSession.status);
-        setCancelFlowStep(CancelFlowStep.NONE);
-        setSelectedReasons([]);
-        setStarRating(null);
-        setSelectedRestActivity(null);
-        return;
-      }
+  //     if (
+  //       dbSession.status === "completed" ||
+  //       dbSession.status === "cancelled"
+  //     ) {
+  //       console.log("Session already", dbSession.status);
+  //       setCancelFlowStep(CancelFlowStep.NONE);
+  //       setSelectedReasons([]);
+  //       setStarRating(null);
+  //       setSelectedRestActivity(null);
+  //       return;
+  //     }
 
-      // Calculate actual duration up to now
-      const startTime = new Date(currentSession.startTime);
-      const endTime = new Date();
-      const actualSeconds = Math.floor(
-        (endTime.getTime() - startTime.getTime()) / 1000
-      );
+  //     // Calculate actual duration up to now
+  //     const startTime = new Date(currentSession.startTime);
+  //     const endTime = new Date();
+  //     const actualSeconds = Math.floor(
+  //       (endTime.getTime() - startTime.getTime()) / 1000
+  //     );
 
-      // Update period with reflection data - use captured values
-      await SessionService.updatePeriod(currentPeriod.id, {
-        actual_duration_minutes: actualSeconds / 60,
-        ended_at: new Date().toISOString(),
-        // Use the appropriate rating based on session type
-        quality_rating: currentSession.type === "focus" ? currentRating : null,
-        rest_activities_selected:
-          currentSession.type === "break" && currentActivity
-            ? [currentActivity]
-            : null,
-        work_time_completed: currentTaskComplete,
-      });
+  //     // Update period with reflection data - use captured values
+  //     await SessionService.updatePeriod(currentPeriod.id, {
+  //       actual_duration_minutes: actualSeconds / 60,
+  //       ended_at: new Date().toISOString(),
+  //       // Use the appropriate rating based on session type
+  //       quality_rating: currentSession.type === "focus" ? currentRating : null,
+  //       rest_activities_selected:
+  //         currentSession.type === "break" && currentActivity
+  //           ? [currentActivity]
+  //           : null,
+  //       work_time_completed: currentTaskComplete,
+  //     });
 
-      // Update session with reflection data - use captured values
-      await SessionService.updateSession(currentSession.id, {
-        status: currentTaskComplete ? "completed" : "cancelled",
-        completed: currentTaskComplete,
-        distraction_reasons_selected:
-          currentReasons.length > 0 ? currentReasons : null,
-        // Ignore: Future - will allow user to add notes.
-        cancelled_reason_details: null,
-      });
+  //     // Update session with reflection data - use captured values
+  //     await SessionService.updateSession(currentSession.id, {
+  //       status: currentTaskComplete ? "completed" : "cancelled",
+  //       completed: currentTaskComplete,
+  //       distraction_reasons_selected:
+  //         currentReasons.length > 0 ? currentReasons : null,
+  //       // Ignore: Future - will allow user to add notes.
+  //       cancelled_reason_details: null,
+  //     });
 
-      // Force sync to Supabase
-      await SessionService.syncToSupabase();
+  //     // Force sync to Supabase
+  //     await SessionService.syncToSupabase();
 
-      // Call the context's cancelSession to clean up UI state
-      cancelSession();
+  //     // Clear all state
+  //     setCancelFlowStep(CancelFlowStep.NONE);
+  //     setSelectedReasons([]);
+  //     setStarRating(null);
+  //     setSelectedRestActivity(null);
+  //   } catch (error) {
+  //     console.error("Error updating session with reflection:", error);
+  //     // Clean up UI state even if DB update fails
+  //     setCancelFlowStep(CancelFlowStep.NONE);
+  //     setSelectedReasons([]);
+  //     setStarRating(null);
+  //     setSelectedRestActivity(null);
+  //   }
+  // };
 
-      // Clear all state
-      setCancelFlowStep(CancelFlowStep.NONE);
-      setSelectedReasons([]);
-      setStarRating(null);
-      setSelectedRestActivity(null);
-    } catch (error) {
-      console.error("Error updating session with reflection:", error);
-      // Clean up UI state even if DB update fails
-      setCancelFlowStep(CancelFlowStep.NONE);
-      setSelectedReasons([]);
-      setStarRating(null);
-      setSelectedRestActivity(null);
-    }
-  };
+  // const handleSkipSessionReflection = async () => {
+  //   if (!currentSession) return;
 
-  const handleSkipSessionReflection = async () => {
-    if (!currentSession) return;
+  //   // Capture current state for task completion
+  //   const currentTaskComplete = isTaskComplete;
 
-    // Capture current state for task completion
-    const currentTaskComplete = isTaskComplete;
+  //   try {
+  //     // Get the current period and session from DB to check latest state
+  //     const currentPeriod = await SessionService.getCurrentPeriod();
+  //     const dbSession = await SessionService.getSession(currentSession.id);
 
-    try {
-      // Get the current period and session from DB to check latest state
-      const currentPeriod = await SessionService.getCurrentPeriod();
-      const dbSession = await SessionService.getSession(currentSession.id);
+  //     // Check if session is already completed or cancelled
+  //     if (!currentPeriod || !dbSession) {
+  //       console.log("Session or period not found, already cleaned up");
+  //       setCancelFlowStep(CancelFlowStep.NONE);
+  //       setSelectedReasons([]);
+  //       setStarRating(null);
+  //       setSelectedRestActivity(null);
+  //       return;
+  //     }
 
-      // Check if session is already completed or cancelled
-      if (!currentPeriod || !dbSession) {
-        console.log("Session or period not found, already cleaned up");
-        setCancelFlowStep(CancelFlowStep.NONE);
-        setSelectedReasons([]);
-        setStarRating(null);
-        setSelectedRestActivity(null);
-        return;
-      }
+  //     if (
+  //       dbSession.status === "completed" ||
+  //       dbSession.status === "cancelled"
+  //     ) {
+  //       console.log("Session already", dbSession.status);
+  //       setCancelFlowStep(CancelFlowStep.NONE);
+  //       setSelectedReasons([]);
+  //       setStarRating(null);
+  //       setSelectedRestActivity(null);
+  //       return;
+  //     }
 
-      if (
-        dbSession.status === "completed" ||
-        dbSession.status === "cancelled"
-      ) {
-        console.log("Session already", dbSession.status);
-        setCancelFlowStep(CancelFlowStep.NONE);
-        setSelectedReasons([]);
-        setStarRating(null);
-        setSelectedRestActivity(null);
-        return;
-      }
+  //     // Calculate actual duration up to now
+  //     const startTime = new Date(currentSession.startTime);
+  //     const endTime = new Date();
+  //     const actualSeconds = Math.floor(
+  //       (endTime.getTime() - startTime.getTime()) / 1000
+  //     );
 
-      // Calculate actual duration up to now
-      const startTime = new Date(currentSession.startTime);
-      const endTime = new Date();
-      const actualSeconds = Math.floor(
-        (endTime.getTime() - startTime.getTime()) / 1000
-      );
+  //     // Clear selected reasons before updating
+  //     setSelectedReasons([]);
 
-      // Clear selected reasons before updating
-      setSelectedReasons([]);
+  //     // Update period with null reflection data
+  //     await SessionService.updatePeriod(currentPeriod.id, {
+  //       actual_duration_minutes: actualSeconds / 60,
+  //       ended_at: new Date().toISOString(),
+  //       work_time_completed: currentTaskComplete,
+  //     });
 
-      // Update period with null reflection data
-      await SessionService.updatePeriod(currentPeriod.id, {
-        actual_duration_minutes: actualSeconds / 60,
-        ended_at: new Date().toISOString(),
-        work_time_completed: currentTaskComplete,
-      });
+  //     // Update session with null reflection data
+  //     await SessionService.updateSession(currentSession.id, {
+  //       status: currentTaskComplete ? "completed" : "cancelled",
+  //       completed: currentTaskComplete,
+  //       cancelled_reason_details: "Skipped reflection",
+  //       distraction_reasons_selected: null,
+  //     });
 
-      // Update session with null reflection data
-      await SessionService.updateSession(currentSession.id, {
-        status: currentTaskComplete ? "completed" : "cancelled",
-        completed: currentTaskComplete,
-        cancelled_reason_details: "Skipped reflection",
-        distraction_reasons_selected: null,
-      });
+  //     // Force sync to Supabase
+  //     await SessionService.syncToSupabase();
 
-      // Force sync to Supabase
-      await SessionService.syncToSupabase();
+  //     // Call the context's cancelSession to clean up UI state
+  //     cancelSession();
 
-      // Call the context's cancelSession to clean up UI state
-      cancelSession();
+  //     // Clear all state
+  //     setCancelFlowStep(CancelFlowStep.NONE);
+  //     setStarRating(null);
+  //     setSelectedRestActivity(null);
+  //   } catch (error) {
+  //     console.error("Error updating session for skip reflection:", error);
+  //     // Clean up UI state even if DB update fails
+  //     setCancelFlowStep(CancelFlowStep.NONE);
+  //     setSelectedReasons([]);
+  //     setStarRating(null);
+  //     setSelectedRestActivity(null);
+  //   }
+  // };
 
-      // Clear all state
-      setCancelFlowStep(CancelFlowStep.NONE);
-      setStarRating(null);
-      setSelectedRestActivity(null);
-    } catch (error) {
-      console.error("Error updating session for skip reflection:", error);
-      // Clean up UI state even if DB update fails
-      setCancelFlowStep(CancelFlowStep.NONE);
-      setSelectedReasons([]);
-      setStarRating(null);
-      setSelectedRestActivity(null);
-    }
-  };
-
-  const toggleReason = (reason: string) => {
+  const toggleReason = async (reason: string) => {
     // Set the selected reason for UI feedback
     setSelectedReasons([reason]);
 
@@ -718,66 +769,14 @@ export default function TimerScreen() {
 
       case CancelFlowStep.RATE_REST:
         return (
-          <Modal
+          <RestActivityRatingModal
             visible={true}
-            animationType="slide"
-            transparent={true}
-            onRequestClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
-          >
-            <View className="flex-1 bg-black/50 justify-center items-center">
-              <View className="bg-white rounded-xl p-6 w-[90%] max-w-[400px]">
-                <Text className="text-2xl font-medium text-center mb-1">
-                  What did you do
-                </Text>
-                <Text className="text-2xl font-medium italic text-center mb-4">
-                  for Deep Rest
-                </Text>
-
-                {currentSession && (
-                  <>
-                    <Text className="text-sm text-gray-600 text-center mb-1">
-                      YOUR REST SESSION ON:
-                    </Text>
-                    <Text className="text-base text-center mb-6">
-                      {getProjectName(currentSession.projectId)}
-                    </Text>
-                  </>
-                )}
-
-                {/* Activity selection buttons */}
-                {[
-                  { label: "MOVEMENT", icon: "arrow-right" as const },
-                  { label: "REFUEL", icon: "coffee" as const },
-                  { label: "SOCIALIZING", icon: "users" as const },
-                  { label: "MINDFULNESS", icon: "heart" as const },
-                  { label: "SOCIAL MEDIA", icon: "mobile" as const },
-                ].map(({ label, icon }) => (
-                  <TouchableOpacity
-                    key={label}
-                    className={`py-3 px-4 mb-3 rounded-md ${
-                      selectedRestActivity === label
-                        ? "bg-gray-200 border border-gray-300"
-                        : "bg-gray-100"
-                    } flex-row justify-between items-center`}
-                    onPress={() => handleCancelFlowRestRating(label)}
-                  >
-                    <View className="flex-row items-center">
-                      <FontAwesome
-                        name={icon}
-                        size={16}
-                        color="#555"
-                        style={{ marginRight: 8 }}
-                      />
-                      <Text className="text-base text-gray-800">{label}</Text>
-                    </View>
-                    {selectedRestActivity === label && (
-                      <FontAwesome name="check" size={16} color="#666" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          </Modal>
+            onClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
+            onSelectActivity={handleCancelFlowRestRating}
+            selectedActivity={selectedRestActivity}
+            sessionLabel="REST SESSION"
+            isCancelFlow={true}
+          />
         );
 
       case CancelFlowStep.SESSION_COMPLETE:
@@ -1039,6 +1038,48 @@ export default function TimerScreen() {
     return <SessionDebugPanel />;
   };
 
+  const forceCompleteReset = async () => {
+    try {
+      // 1. Clear all UI state
+      setShowRatingModal(false);
+      setShowBreakRatingModal(false);
+      setCancelFlowStep(CancelFlowStep.NONE);
+      setSelectedReasons([]);
+      setStarRating(null);
+      setSelectedRestActivity(null);
+      setSessionNotes("");
+      setIsNoteExpanded(false);
+      setIsFullScreen(false);
+      setShowStartModal(false);
+      setIsCompleteSessionScreen(false);
+      setShowExportModal(false);
+      setIsTaskComplete(false);
+      setDeepWorkTime(0);
+      setDeepRestTime(0);
+
+      // 2. Clear AsyncStorage session data
+      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_SESSION);
+      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_PERIOD);
+
+      // 3. Reset session service state
+      await SessionService.setCurrentPeriod(null);
+      await SessionService.setCurrentSession(null);
+
+      // 4. Force context reset
+      if (cancelSession) {
+        await cancelSession();
+      }
+
+      // 5. Force refresh analytics
+      handleRefresh();
+
+      console.log("❗ COMPLETE STATE RESET PERFORMED");
+    } catch (error) {
+      console.error("Error during force reset:", error);
+      alert("Reset failed: " + error);
+    }
+  };
+
   // Helper function for formatting duration in export
   const formatDurationForExport = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -1046,16 +1087,41 @@ export default function TimerScreen() {
     return `${hours}h ${minutes}m`;
   };
 
-  const handleCancelFlowFocusRating = (rating: number) => {
+  const handleCancelFlowFocusRating = async (rating: number) => {
+    if (!currentSession) return;
+
     // Capture current value to avoid race conditions
     setStarRating(rating);
-    // Move to reflection step
-    setCancelFlowStep(CancelFlowStep.REFLECT);
-  };
 
-  const handleCancelFlowRestRating = (activity: string) => {
-    // Capture current value to avoid race conditions
-    setSelectedRestActivity(activity);
+    try {
+      // Get the current period and session
+      const currentPeriod = await SessionService.getCurrentPeriod();
+      const dbSession = await SessionService.getSession(currentSession.id);
+
+      if (currentPeriod && dbSession) {
+        // Calculate actual duration
+        const startTime = new Date(currentSession.startTime);
+        const endTime = new Date();
+        const actualSeconds = Math.floor(
+          (endTime.getTime() - startTime.getTime()) / 1000
+        );
+
+        // Update period with duration and rating
+        console.log("Updating period from handleCancelFlowFocusRating");
+        await SessionService.updatePeriod(
+          currentPeriod.id,
+          {
+            actual_duration_minutes: actualSeconds / 60,
+            ended_at: new Date().toISOString(),
+            quality_rating: rating,
+          },
+          true
+        );
+      }
+    } catch (error) {
+      console.error("Error updating period for cancel flow:", error);
+    }
+
     // Move to reflection step
     setCancelFlowStep(CancelFlowStep.REFLECT);
   };
@@ -1071,6 +1137,102 @@ export default function TimerScreen() {
     }
   };
 
+  // New unified function that replaces both handleSubmitReflection and handleFinalizeSession
+  const completeSessionWithReflection = async (options: {
+    sessionId: string;
+    isTaskComplete: boolean;
+    reasons: string[];
+    notes?: string;
+    rating?: number | null;
+    activity?: string | null;
+  }) => {
+    if (!currentSession) return;
+
+    try {
+      // Get the current period and session from DB to check latest state
+      const currentPeriod = await SessionService.getCurrentPeriod();
+      const dbSession = await SessionService.getSession(options.sessionId);
+
+      // Early return conditions - just log and let finally block handle cleanup
+      if (!currentPeriod || !dbSession) {
+        console.log("Session or period not found, already cleaned up");
+        return;
+      }
+
+      if (
+        dbSession.status === "completed" ||
+        dbSession.status === "cancelled"
+      ) {
+        console.log("Session already", dbSession.status);
+        return;
+      }
+
+      // Calculate actual duration up to now
+      const startTime = new Date(currentSession.startTime);
+      const endTime = new Date();
+      const actualSeconds = Math.floor(
+        (endTime.getTime() - startTime.getTime()) / 1000
+      );
+
+      // Update period with reflection data
+      console.log("Updating period from completeSessionWithReflection");
+      await SessionService.updatePeriod(
+        currentPeriod.id,
+        {
+          actual_duration_minutes: actualSeconds / 60,
+          ended_at: new Date().toISOString(),
+          quality_rating: options.rating || null,
+          rest_activities_selected: options.activity
+            ? [options.activity]
+            : null,
+          work_time_completed: options.isTaskComplete,
+          user_notes: options.notes || null,
+        },
+        true
+      );
+
+      // Calculate session totals
+      const totals = await SessionService.calculateSessionTotals(
+        options.sessionId
+      );
+
+      // Update session with reflection data and totals
+      await SessionService.updateSession(options.sessionId, {
+        status: options.isTaskComplete ? "completed" : "cancelled",
+        completed: options.isTaskComplete,
+        distraction_reasons_selected:
+          options.reasons.length > 0 ? options.reasons : null,
+        user_notes: options.notes || null,
+        total_deep_work_minutes: totals.total_deep_work_minutes,
+        total_deep_rest_minutes: totals.total_deep_rest_minutes,
+      });
+
+      // Force sync to Supabase
+      await SessionService.syncToSupabase();
+
+      // Call the context's cancelSession to clean up UI state
+      try {
+        await cancelSession();
+      } catch (error) {
+        console.error("Error cancelling session:", error);
+        setError(`Error cancelling session ${error}`);
+      }
+    } catch (error) {
+      console.error("Error completing session with reflection:", error);
+    } finally {
+      // Always clean up ALL UI state, regardless of success or failure path
+      setCancelFlowStep(CancelFlowStep.NONE);
+      setSelectedReasons([]);
+      setStarRating(null);
+      setSelectedRestActivity(null);
+      setSessionNotes("");
+      setIsNoteExpanded(false);
+      setShowRatingModal(false);
+      setShowBreakRatingModal(false);
+    }
+  };
+
+  // Update handleFinalizeSession to use the new SessionService method
   const handleFinalizeSession = async () => {
     if (!currentSession) {
       setCancelFlowStep(CancelFlowStep.NONE);
@@ -1078,31 +1240,41 @@ export default function TimerScreen() {
     }
 
     try {
-      // Update session with notes
-      await SessionService.updateSession(currentSession.id, {
-        user_notes: sessionNotes || null,
+      // First, handle the session completion with reflection in the database
+      await completeSessionWithReflection({
+        sessionId: currentSession.id,
+        isTaskComplete,
+        reasons: selectedReasons,
+        notes: sessionNotes,
+        rating: starRating,
+        activity: selectedRestActivity,
       });
 
-      // Force sync to Supabase
-      await SessionService.syncToSupabase();
+      // Then use the new SessionService method to ensure proper cleanup
+      await SessionService.completeSessionLifecycle(currentSession.id);
 
-      // Call context's cancelSession to clean up UI state
-      cancelSession();
+      // Call context's cancelSession to update UI state
+      await cancelSession();
     } catch (error) {
-      console.error("Error finalizing session:", error);
-    } finally {
-      // Always clean up UI state
+      console.error("Error during session finalization:", error);
+
+      // Even if there's an error, attempt to clean up UI state
       setCancelFlowStep(CancelFlowStep.NONE);
       setSelectedReasons([]);
       setStarRating(null);
       setSelectedRestActivity(null);
-      setSessionNotes(""); // Clear session notes
+      setSessionNotes("");
       setIsNoteExpanded(false);
+      setShowRatingModal(false);
+      setShowBreakRatingModal(false);
     }
   };
 
   return isFullScreen ? (
-    <FullScreenTimer />
+    <>
+      {error && <Text className="text-red-500">{error}</Text>}
+      <FullScreenTimer />
+    </>
   ) : (
     <ScrollView
       className="flex-1 bg-white"
@@ -1112,8 +1284,21 @@ export default function TimerScreen() {
       {/* {__DEV__ && renderAuthDebug()} */}
 
       {/* Session Debug Panel (only in development mode) */}
-      {/* {__DEV__ && renderSessionDebug()} */}
+      {__DEV__ && renderSessionDebug()}
 
+      {/* Debug State */}
+      {__DEV__ && (
+        <View className="flex-row justify-center">
+          <TouchableOpacity
+            className="bg-red-600 p-3 rounded-md w-48 m-4"
+            onPress={forceCompleteReset}
+          >
+            <Text className="text-white font-bold text-center">
+              Reset State / Storage
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {/* Overview Section */}
       {!currentSession && (
         <View className="w-full bg-white rounded-lg mb-4">
@@ -1391,68 +1576,13 @@ export default function TimerScreen() {
         </View>
       </Modal>
 
-      {/* Break Rating Modal */}
-      <Modal
+      <RestActivityRatingModal
         visible={showBreakRatingModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowBreakRatingModal(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-center items-center">
-          <View className="bg-white rounded-xl p-6 w-[90%] max-w-[400px]">
-            <Text className="text-2xl font-medium text-center mb-1">
-              What did you do
-            </Text>
-            <Text className="text-2xl font-medium italic text-center mb-4">
-              for Deep Rest
-            </Text>
-
-            {currentSession && (
-              <>
-                <Text className="text-sm text-gray-600 text-center mb-1">
-                  YOUR 1ST REST SESSION ON:
-                </Text>
-                <Text className="text-base text-center mb-6">
-                  {getProjectName(currentSession.projectId)}
-                </Text>
-              </>
-            )}
-
-            {/* Activity selection buttons */}
-            {[
-              { label: "MOVEMENT", icon: "arrow-right" as const },
-              { label: "REFUEL", icon: "coffee" as const },
-              { label: "SOCIALIZING", icon: "users" as const },
-              { label: "MINDFULNESS", icon: "heart" as const },
-              { label: "SOCIAL MEDIA", icon: "mobile" as const },
-            ].map(({ label, icon }) => (
-              <TouchableOpacity
-                key={label}
-                className={`py-3 px-4 mb-3 rounded-md ${
-                  selectedRestActivity === label
-                    ? "bg-gray-200 border border-gray-300"
-                    : "bg-gray-100"
-                } flex-row justify-between items-center`}
-                onPress={() => handleRestActivitySubmit(label)}
-              >
-                <View className="flex-row items-center">
-                  <FontAwesome
-                    name={icon}
-                    size={16}
-                    color="#555"
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text className="text-base text-gray-800">{label}</Text>
-                </View>
-                {selectedRestActivity === label && (
-                  <FontAwesome name="check" size={16} color="#666" />
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </Modal>
-
+        onClose={() => setShowBreakRatingModal(false)}
+        onSelectActivity={submitRestPeriodWithActivity}
+        selectedActivity={selectedRestActivity}
+        sessionLabel="REST SESSION"
+      />
       {/* Cancel Flow */}
       {renderCancelFlow()}
 

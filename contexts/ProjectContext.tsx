@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { Project } from "@/types/project";
-import { ProjectService } from "@/services/ProjectService";
+import { PendingOperation, ProjectService } from "@/services/ProjectService";
 import { checkConnection } from "@/lib/supabase";
 
 interface ProjectContextType {
@@ -16,7 +16,7 @@ interface ProjectContextType {
   updateProject: (project: Project) => Promise<Project>;
   deleteProject: (id: string) => Promise<boolean>;
   syncProjects: () => Promise<void>;
-  clearPendingOperations: () => Promise<void>;
+  clearPendingOperations: () => Promise<PendingOperation[]>;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);

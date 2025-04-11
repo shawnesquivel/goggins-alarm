@@ -19,7 +19,7 @@ const initialAnalytics: AnalyticsData = {
   goalProgressPercentage: 0,
 };
 
-export function useAnalytics() {
+export default function useAnalytics() {
   const [analytics, setAnalytics] = useState<AnalyticsData>(initialAnalytics);
   const [isAnalyticsLoading, setIsAnalyticsLoading] = useState(false);
 

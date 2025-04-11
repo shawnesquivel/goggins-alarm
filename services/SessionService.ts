@@ -167,7 +167,8 @@ export const SessionService: SessionServiceInterface = {
 
   async updatePeriod(
     periodId: string,
-    periodData: DbPeriodUpdate
+    periodData: DbPeriodUpdate,
+    skipTotals: boolean = false
   ): Promise<DbPeriod> {
     console.log("SessionService: Updating period", periodId, periodData);
 
@@ -230,8 +231,9 @@ export const SessionService: SessionServiceInterface = {
       timestamp: Date.now(),
     });
 
-    // Calculate session totals if period is completed
+    // Calculate session totals if period is completed and skipTotals is false
     if (
+      !skipTotals &&
       updatedPeriod.actual_duration_minutes != undefined &&
       updatedPeriod.session_id
     ) {
@@ -575,5 +577,51 @@ export const SessionService: SessionServiceInterface = {
       total_deep_work_minutes: totalWorkMinutes,
       total_deep_rest_minutes: totalRestMinutes,
     };
+  },
+
+  async completeSessionLifecycle(sessionId: string): Promise<boolean> {
+    try {
+      // First try to sync data to Supabase
+      const syncSuccessful = await this.syncToSupabase(true);
+
+      if (!syncSuccessful) {
+        console.warn(
+          "Sync to Supabase failed during session completion, operations queued for later sync"
+        );
+        // Make sure completion operation is recorded
+        // (All updates should already be in pending queue from earlier operations)
+      }
+
+      // Clear session state regardless of sync result
+      await this.setCurrentSession(null);
+      await this.setCurrentPeriod(null);
+      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_SESSION);
+      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_PERIOD);
+
+      // Note: We're specifically NOT clearing pending operations
+      // They'll be synced later when connectivity is restored
+
+      return syncSuccessful;
+    } catch (error) {
+      console.error("Error in completeSessionLifecycle:", error);
+      return false;
+    }
+  },
+
+  async setupBackgroundSync(intervalMinutes: number = 5): Promise<void> {
+    // This could be called from your App.tsx or similar initialization point
+    setInterval(async () => {
+      try {
+        const pendingOps = await this.getPendingOperations();
+        if (pendingOps.length > 0) {
+          console.log(
+            `Attempting background sync of ${pendingOps.length} operations`
+          );
+          await this.syncToSupabase();
+        }
+      } catch (error) {
+        console.error("Background sync error:", error);
+      }
+    }, intervalMinutes * 60 * 1000);
   },
 };

@@ -49,7 +49,7 @@ interface PomodoroContextType {
     breakActivities?: string[]
   ) => void;
   startBreakSession: () => void;
-  cancelSession: () => void;
+  cancelSession: () => Promise<void>;
 
   // Settings
   settings: TimerSettings;
@@ -337,12 +337,17 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     );
 
     // Update work period
-    await SessionService.updatePeriod(currentPeriod.id, {
-      actual_duration_minutes: actualSeconds / 60,
-      ended_at: endTime.toISOString(),
-      quality_rating: rating || null,
-      user_notes: notes || null,
-    });
+    console.log("Updating period from AlarmContext.completeWorkPeriod");
+    await SessionService.updatePeriod(
+      currentPeriod.id,
+      {
+        actual_duration_minutes: actualSeconds / 60,
+        ended_at: endTime.toISOString(),
+        quality_rating: rating || null,
+        user_notes: notes || null,
+      },
+      !startBreak
+    );
 
     // Only complete session if not transitioning to break
     if (!startBreak) {
@@ -394,11 +399,16 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     );
 
     // Update rest period
-    await SessionService.updatePeriod(currentPeriod.id, {
-      actual_duration_minutes: actualSeconds / 60,
-      ended_at: endTime.toISOString(),
-      rest_activities_selected: activities || null,
-    });
+    console.log("Updating period from AlarmContext.completeRestPeriod");
+    await SessionService.updatePeriod(
+      currentPeriod.id,
+      {
+        actual_duration_minutes: actualSeconds / 60,
+        ended_at: endTime.toISOString(),
+        rest_activities_selected: activities || null,
+      },
+      startNewWork
+    );
 
     // Force sync to Supabase
     await SessionService.syncToSupabase();
@@ -582,7 +592,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   };
 
   // Add a function to handle cancellation, which we should update
-  const handleCancelSession = async () => {
+  const cancelSession = async () => {
+    /**
+     * Handle UI updates to state
+     */
     console.log("AlarmContext: Cancelling session", currentSession?.id);
 
     if (!currentSession) return;
@@ -591,10 +604,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     stopTimer();
     setCurrentSession(null);
     setTimerStatus(TimerStatus.IDLE);
-    await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
-
-    // Clear current period in SessionService
-    await SessionService.setCurrentPeriod(null);
   };
 
   // New function to start the next work period in the same session
@@ -682,7 +691,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         resumeSession,
         completeSession,
         startBreakSession,
-        cancelSession: handleCancelSession,
+        cancelSession,
 
         // Settings
         settings,
