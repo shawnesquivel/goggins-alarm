@@ -9,14 +9,13 @@ import {
 } from "react-native";
 import { usePomodoro } from "@/contexts/AlarmContext";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import { useRouter, useNavigation } from "expo-router";
+import { useNavigation } from "expo-router";
 import StartSessionModal from "@/components/shared/modals/StartSessionModal";
 import {
   useFonts,
   LibreCaslonText_400Regular,
 } from "@expo-google-fonts/libre-caslon-text";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
 import { useProjects } from "@/contexts/ProjectContext";
 import SessionDebugPanel from "@/components/debug/SessionDebugPanel";
 import { format } from "date-fns";
@@ -27,10 +26,13 @@ import useAnalytics from "@/app/hooks/useAnalytics";
 import { RestActivityRatingModal } from "@/components/cycle/RestActivityRatingModal";
 import { SESSION_STORAGE_KEYS } from "@/types/session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import WorkToRestBtn from "@/components/cycle/WorkToRestBtn";
+import RestToWorkBtn from "@/components/cycle/RestToWorkBtn";
+import EndCycleEarlyBtn from "@/components/cycle/EndCycleEarlybtn";
+import Overview from "@/components/cycle/Overview";
 import AuthDebugPanel from "@/components/debug/AuthDebugPanel";
 
 export default function TimerScreen() {
-  const router = useRouter();
   const navigation = useNavigation();
   const {
     remainingSeconds,
@@ -68,7 +70,7 @@ export default function TimerScreen() {
   // Add near other state declarations
   enum CancelFlowStep {
     NONE,
-    TASK_COMPLETE,
+    TASK_COMPLETE, // Did you finish your task?
     RATE_FOCUS, // For deep work rating
     RATE_REST, // For deep rest rating
     CONFIRM,
@@ -106,12 +108,6 @@ export default function TimerScreen() {
 
     calculateTimes();
   }, [cancelFlowStep, currentSession?.id]);
-
-  // useEffect(() => {
-  //   if (currentSession) {
-  //     handleRefresh();
-  //   }
-  // }, [currentSession]);
 
   // Add export ref
   const exportRef = useRef({
@@ -998,6 +994,7 @@ export default function TimerScreen() {
 
   const forceCompleteReset = async () => {
     try {
+      console.log("Force Complete Reset");
       // 1. Clear all UI state
       setShowRatingModal(false);
       setShowBreakRatingModal(false);
@@ -1031,7 +1028,7 @@ export default function TimerScreen() {
       // 5. Force refresh analytics
       handleRefresh();
 
-      console.log("❗ COMPLETE STATE RESET PERFORMED");
+      console.log("❗ forceCompleteReset: Finished");
     } catch (error) {
       console.error("Error during force reset:", error);
       alert("Reset failed: " + error);
@@ -1254,102 +1251,8 @@ export default function TimerScreen() {
           </TouchableOpacity>
         </View>
       )}
-      {/* Overview Section */}
-      {!currentSession && (
-        <View className="w-full bg-white rounded-lg mb-4">
-          <View className="px-4 py-3">
-            <Text className="text-sm text-gray-600 mb-1">
-              WELCOME BACK SHAY,
-            </Text>
-            <Text className="text-2xl font-medium mb-4">
-              {format(new Date(), "EEE, MMM d")}
-            </Text>
 
-            <View className="flex-row justify-between mb-4">
-              <Text className="text-sm font-medium">OVERVIEW</Text>
-              <Text className="text-sm text-gray-400">TASKS</Text>
-            </View>
-
-            <View className="items-center mb-6">
-              {/* Circle progress indicator - just showing % for MVP */}
-              <View className="w-32 h-32 bg-gray-100 rounded-full mb-4 items-center justify-center">
-                <Text className="text-xl font-bold">
-                  {isAnalyticsLoading
-                    ? "..."
-                    : `${analytics.goalProgressPercentage}%`}
-                </Text>
-              </View>
-              <Text className="text-sm text-gray-600 mb-1">
-                TOTAL DEEP WORK
-              </Text>
-              <Text className="text-2xl">
-                {isAnalyticsLoading ? "..." : analytics.totalDeepWork}
-              </Text>
-            </View>
-            <View className="flex-row justify-end mb-4">
-              <TouchableOpacity
-                onPress={handleRefresh}
-                disabled={isAnalyticsLoading}
-                className="p-2"
-              >
-                <FontAwesome
-                  name="refresh"
-                  size={16}
-                  color="#808080"
-                  style={{
-                    transform: [
-                      { rotate: isAnalyticsLoading ? "45deg" : "0deg" },
-                    ],
-                  }}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Column Headers */}
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-sm text-gray-600 flex-1">
-                TODAY'S SUMMARY
-              </Text>
-              <View className="flex-row w-24 justify-end">
-                <Text className="text-sm text-gray-600 w-12 text-center">
-                  QTY
-                </Text>
-                <Text className="text-sm text-gray-600 w-12 text-center">
-                  MIN
-                </Text>
-              </View>
-            </View>
-
-            <View className="flex-row justify-between mb-2">
-              <Text className="text-base flex-1">
-                Deep <Text className="italic">Work</Text>
-              </Text>
-              <View className="flex-row w-24 justify-end">
-                <Text className="text-base w-12 text-center">
-                  {isAnalyticsLoading ? "..." : analytics.deepWorkSessions}
-                </Text>
-                <Text className="text-base w-12 text-center">
-                  {isAnalyticsLoading ? "..." : analytics.deepWorkMinutes}
-                </Text>
-              </View>
-            </View>
-
-            <View className="flex-row justify-between">
-              <Text className="text-base flex-1">
-                Deep <Text className="italic">Rest</Text>
-              </Text>
-              <View className="flex-row w-24 justify-end">
-                <Text className="text-base w-12 text-center">
-                  {isAnalyticsLoading ? "..." : analytics.deepRestSessions}
-                </Text>
-                <Text className="text-base w-12 text-center">
-                  {isAnalyticsLoading ? "..." : analytics.deepRestMinutes}
-                </Text>
-              </View>
-            </View>
-          </View>
-        </View>
-      )}
+      <Overview />
 
       {/* Home Page Timer Display */}
       <View className="items-center py-8">
@@ -1410,35 +1313,20 @@ export default function TimerScreen() {
               </>
             )}
 
-            {/* Action Buttons */}
-            <TouchableOpacity
-              className="bg-black py-5 px-6 rounded-md items-center w-full mb-4"
-              onPress={() => {
-                if (currentSession?.type === "focus") {
-                  setShowRatingModal(true);
-                } else {
-                  setShowBreakRatingModal(true);
-                }
-              }}
-            >
-              <Text className="text-white text-base font-bold">
-                {currentSession?.type === "focus" && isOvertime
-                  ? "START DEEP REST"
-                  : currentSession?.type === "focus" &&
-                    !isOvertime &&
-                    "START DEEP REST EARLY"}
-                {currentSession?.type === "break" && "CONTINUE DEEP WORK"}
-              </Text>
-            </TouchableOpacity>
+            {/* Cycle between work and rest depending on the session type */}
+            <WorkToRestBtn
+              type={currentSession?.type}
+              isOvertime={isOvertime}
+              setShowRatingModal={setShowRatingModal}
+            />
 
-            <TouchableOpacity
-              className="py-4 px-6 rounded-md items-center w-full mb-3"
-              onPress={handleCancelSession}
-            >
-              <Text className="text-black text-base">
-                END CYCLE (Cancel Session)
-              </Text>
-            </TouchableOpacity>
+            <RestToWorkBtn
+              type={currentSession?.type}
+              isOvertime={isOvertime}
+              setShowBreakRatingModal={setShowBreakRatingModal}
+            />
+
+            <EndCycleEarlyBtn cancelSession={handleCancelSession} />
 
             {/* Add Export Button */}
             {/* Future: Only show this if we are on Complete Session Modal */}
