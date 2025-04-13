@@ -27,6 +27,7 @@ import useAnalytics from "@/app/hooks/useAnalytics";
 import { RestActivityRatingModal } from "@/components/cycle/RestActivityRatingModal";
 import { SESSION_STORAGE_KEYS } from "@/types/session";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import AuthDebugPanel from "@/components/debug/AuthDebugPanel";
 
 export default function TimerScreen() {
   const router = useRouter();
@@ -995,49 +996,6 @@ export default function TimerScreen() {
 
   if (!fontsLoaded) return null;
 
-  // Function to display user info for debugging
-  const renderAuthDebug = () => {
-    if (!session) {
-      return (
-        <View className="p-2.5 m-2.5 bg-gray-100 rounded border border-gray-300">
-          <TouchableOpacity
-            className="mt-2 bg-red-400 p-1.5 rounded items-center"
-            onPress={() => router.push("/login")}
-          >
-            <Text className="text-white text-xs font-bold">
-              Not Logged In: Go to Login
-            </Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-    return (
-      <View className="p-2.5 m-2.5 bg-gray-100 rounded border border-gray-300">
-        <View className="flex-row items-center gap-4">
-          <View className="flex-row items-center space-x-2">
-            <Text className="text-xs font-mono">
-              User: {session.user.email} ({session.user.id.substring(0, 8)})
-            </Text>
-          </View>
-          <TouchableOpacity
-            className="bg-red-400 px-3 py-1 rounded"
-            onPress={async () => {
-              await supabase.auth.signOut();
-              router.replace("/login");
-            }}
-          >
-            <Text className="text-white text-xs font-bold">Sign Out</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  const renderSessionDebug = () => {
-    if (!__DEV__) return null;
-    return <SessionDebugPanel />;
-  };
-
   const forceCompleteReset = async () => {
     try {
       // 1. Clear all UI state
@@ -1280,11 +1238,8 @@ export default function TimerScreen() {
       className="flex-1 bg-white"
       contentContainerStyle={{ padding: 20 }}
     >
-      {/* Auth Debug Panel (only in development mode) */}
-      {/* {__DEV__ && renderAuthDebug()} */}
-
-      {/* Session Debug Panel (only in development mode) */}
-      {__DEV__ && renderSessionDebug()}
+      <AuthDebugPanel />
+      <SessionDebugPanel />
 
       {/* Debug State */}
       {__DEV__ && (
