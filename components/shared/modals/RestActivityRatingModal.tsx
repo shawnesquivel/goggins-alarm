@@ -3,26 +3,18 @@ import { FontAwesome } from "@expo/vector-icons";
 import React from "react";
 import { usePomodoro } from "@/contexts/AlarmContext";
 import { restActivitiesIcons } from "@/constants/CancelFlowStep";
+
 interface RestActivityRatingModalProps {
   visible: boolean;
   onClose: () => void;
   onSelectActivity: (activity: string) => void;
   selectedActivity: string | null;
-  sessionLabel?: string;
-  getProjectName?: (id: string) => string;
+  mode: "normal" | "cancel";
 }
 
-// Create a new component for rest activity rating
 export const RestActivityRatingModal: React.FC<
   RestActivityRatingModalProps
-> = ({
-  visible,
-  onClose,
-  onSelectActivity,
-  selectedActivity,
-  sessionLabel = "REST SESSION", // Default label
-  getProjectName,
-}) => {
+> = ({ visible, onClose, onSelectActivity, selectedActivity, mode }) => {
   const { currentSession } = usePomodoro();
 
   return (
@@ -41,16 +33,11 @@ export const RestActivityRatingModal: React.FC<
             for Deep Rest
           </Text>
 
-          {currentSession && getProjectName && (
-            <>
-              <Text className="text-sm text-gray-600 text-center mb-1">
-                YOUR {sessionLabel} ON:
-              </Text>
-              <Text className="text-base text-center mb-6">
-                {getProjectName(currentSession.projectId)}
-              </Text>
-            </>
-          )}
+          <Text className="text-sm text-gray-600 text-center mb-2">
+            {mode === "normal"
+              ? "Choose activity to start next Deep Work"
+              : "Choose activity to end session"}
+          </Text>
 
           {restActivitiesIcons.map(({ id, icon }) => (
             <TouchableOpacity

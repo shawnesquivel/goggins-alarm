@@ -2,8 +2,8 @@ import TaskCompleteModal from "./TaskCompleteModal";
 import { CancelFlowStep } from "@/constants/CancelFlowStep";
 import ConfirmModal from "./ConfirmModal";
 import ReflectModal from "./ReflectModal";
-import RateFocusModal from "./RateFocusModal";
-import { RestActivityRatingModal } from "./RestActivityRatingModal";
+import FocusRatingModal from "@/components/shared/modals/FocusRatingModal";
+import { RestActivityRatingModal } from "@/components/shared/modals/RestActivityRatingModal";
 import SessionCompleteModal from "./SessionCompleteModal";
 
 interface EndEarlyModalProps {
@@ -91,21 +91,23 @@ const EndEarlyModal = ({
 
     case CancelFlowStep.RATE_FOCUS:
       return (
-        <RateFocusModal
-          setCancelFlowStep={setCancelFlowStep}
-          handleCancelFlowFocusRating={handleCancelFlowFocusRating}
+        <FocusRatingModal
+          visible={true}
+          onClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
+          onSubmitRating={handleCancelFlowFocusRating}
           starRating={starRating}
+          mode="cancel"
         />
       );
 
     case CancelFlowStep.RATE_REST:
       return (
         <RestActivityRatingModal
-          visible={showBreakRatingModal}
-          onClose={() => setShowBreakRatingModal(false)}
+          visible={true}
+          onClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
           onSelectActivity={handleCancelFlowRestRating}
           selectedActivity={selectedRestActivity}
-          sessionLabel="REST SESSION"
+          mode="cancel"
         />
       );
 
