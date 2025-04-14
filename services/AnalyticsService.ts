@@ -1,12 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { SessionService } from "./SessionService";
 import { format } from "date-fns";
-
 export const AnalyticsService = {
   async getUserDailyGoal(): Promise<number> {
     try {
       // Query user's daily goal from Supabase
       const { data: authData } = await supabase.auth.getUser();
+
       if (authData?.user) {
         const { data } = await supabase
           .from("users")
@@ -19,6 +19,7 @@ export const AnalyticsService = {
         }
       }
 
+      console.warn("No user or daily goal found, using default: 60 minutes");
       // Default value if no user or no setting
       return 60;
     } catch (error) {
@@ -80,10 +81,7 @@ export const AnalyticsService = {
 
     // Get daily goal and calculate percentage
     const dailyGoal = await this.getUserDailyGoal();
-    const goalPercentage = Math.min(
-      100,
-      Math.round((workMinutes / dailyGoal) * 100)
-    );
+    const goalPercentage = Math.round((workMinutes / dailyGoal) * 100);
 
     // Add these calculations before the return statement
     const restPeriods = periods.filter(
@@ -140,8 +138,6 @@ export const AnalyticsService = {
         .lte("created_at", now.toISOString());
 
       if (!sessions) return { totalSessions: 0, totalMinutes: 0 };
-
-      console.log("Rest sessions:", sessions);
 
       const totalMinutes = sessions.reduce(
         (sum, session) =>
@@ -215,8 +211,6 @@ export const AnalyticsService = {
 
       if (!projectStats) return [];
 
-      console.log("Raw session stats:", projectStats);
-
       // Aggregate by project
       const aggregatedStats = projectStats.reduce(
         (acc, session) => {
@@ -225,8 +219,8 @@ export const AnalyticsService = {
           if (!acc[session.project_id]) {
             acc[session.project_id] = {
               projectId: session.project_id,
-              name: session.projects.name,
-              color: session.projects.color,
+              name: session.projects[0].name,
+              color: session.projects[0].color,
               totalMinutes: 0,
             };
           }
@@ -246,8 +240,6 @@ export const AnalyticsService = {
           }
         >
       );
-
-      console.log("Aggregated project stats:", aggregatedStats);
 
       return Object.values(aggregatedStats);
     } catch (error) {

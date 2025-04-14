@@ -3,12 +3,13 @@ import { Text, View, TouchableOpacity } from "react-native";
 import { format } from "date-fns";
 import useAnalytics from "@/app/hooks/useAnalytics";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
+import ProgressCircle from "./ProgressCircle";
 
 const Overview = () => {
   const { currentSession } = usePomodoro();
   const { analytics, isAnalyticsLoading, handleRefresh } = useAnalytics();
 
-  // If runnning a timer, hide Overview
+  // If running a timer, hide Overview
   if (currentSession) return null;
 
   return (
@@ -25,14 +26,12 @@ const Overview = () => {
         </View>
 
         <View className="items-center mb-6">
-          {/* Circle progress indicator - just showing % for MVP */}
-          <View className="w-32 h-32 bg-gray-100 rounded-full mb-4 items-center justify-center">
-            <Text className="text-xl font-bold">
-              {isAnalyticsLoading
-                ? "..."
-                : `${analytics.goalProgressPercentage}%`}
-            </Text>
-          </View>
+          {/* Use the extracted ProgressCircle component */}
+          <ProgressCircle
+            percentage={analytics.goalProgressPercentage}
+            deepWorkMinutes={analytics.deepWorkMinutes}
+            isLoading={isAnalyticsLoading}
+          />
           <Text className="text-sm text-gray-600 mb-1">TOTAL DEEP WORK</Text>
           <Text className="text-2xl">
             {isAnalyticsLoading ? "..." : analytics.totalDeepWork}
