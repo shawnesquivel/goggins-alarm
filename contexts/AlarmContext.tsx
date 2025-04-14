@@ -37,17 +37,11 @@ interface PomodoroContextType {
     taskDescription: string,
     projectId: string,
     tags: string[],
-    customDuration?: number,
+    duration: number,
     customBreakDuration?: number
   ) => void;
   pauseSession: () => void;
   resumeSession: () => void;
-  completeSession: (
-    rating?: number,
-    notes?: string,
-    transitionToBreak?: boolean,
-    breakActivities?: string[]
-  ) => void;
   startBreakSession: () => void;
   cancelSession: () => Promise<void>;
 
@@ -127,11 +121,26 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         if (savedSession) {
           const session = JSON.parse(savedSession);
 
+          // Add additional check for cancelled status
+          if (session.status === "cancelled") {
+            console.log("Found cancelled session, removing from storage");
+            await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+            return;
+          }
+
           // Only restore if session is recent (within last hour)
           const lastSessionTime = new Date(session.startTime).getTime();
           const oneHourAgo = Date.now() - 60 * 60 * 1000;
 
           if (lastSessionTime > oneHourAgo && !session.isCompleted) {
+            // Additional verification with SessionService
+            const dbSession = await SessionService.getSession(session.id);
+            if (dbSession && dbSession.status === "cancelled") {
+              console.log("Session was cancelled in DB, not restoring");
+              await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_SESSION);
+              return;
+            }
+
             setCurrentSession(session);
 
             // Calculate remaining time
@@ -211,8 +220,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
   // Sound functions
   const playTimerCompleteSound = async () => {
     try {
-      console.log("⚠️ SOUND: Playing timer complete sound");
-      console.log("⚠️ Current isOvertime state:", isOvertime);
+      console.log("⚠️ Stub: Current isOvertime state:", isOvertime);
       // const { sound } = await Audio.Sound.createAsync(
       //   require("@/assets/sounds/timer-complete.mp3")
       // );
@@ -228,17 +236,13 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     taskDescription: string,
     projectId: string,
     tags: string[],
-    customDuration?: number,
+    duration: number,
     customBreakDuration?: number
   ) => {
     // Reset all session state
     isOvertimeRef.current = false;
     setIsOvertime(false);
     setNextBreakDuration(null);
-
-    // Create new session with either custom duration or default from settings
-    const duration =
-      customDuration !== undefined ? customDuration : settings.focusDuration;
 
     // Store custom break duration for next break if provided
     if (customBreakDuration !== undefined) {
@@ -250,7 +254,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       taskDescription,
       projectId,
       startTime: new Date(),
-      duration: duration,
+      duration,
       isCompleted: false,
       tags,
       type: "focus",
@@ -283,7 +287,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
 
     setCurrentSession(newSession);
-    // Convert minutes to seconds (handle fractional minutes for short sessions)
     setRemainingSeconds(Math.round(duration * 60));
     setTimerStatus(TimerStatus.RUNNING);
 
@@ -427,22 +430,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     // If startNewWork is true, immediately start the next work period
     if (startNewWork) {
       await startNextWorkPeriod(sessionId, projectId, taskDescription);
-    }
-  };
-
-  // Keep for backward compatibility, but simplified
-  const completeSession = async (
-    rating?: number,
-    notes?: string,
-    transitionToBreak: boolean = false,
-    breakActivities?: string[]
-  ) => {
-    if (!currentSession) return;
-
-    if (currentSession.type === "focus") {
-      await completeWorkPeriod(rating, notes, transitionToBreak);
-    } else if (currentSession.type === "break") {
-      await completeRestPeriod(breakActivities);
     }
   };
 
@@ -591,19 +578,52 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  // Add a function to handle cancellation, which we should update
   const cancelSession = async () => {
-    /**
-     * Handle UI updates to state
-     */
     console.log("AlarmContext: Cancelling session", currentSession?.id);
 
     if (!currentSession) return;
 
-    // Just handle UI state
+    // Stop timer
     stopTimer();
-    setCurrentSession(null);
-    setTimerStatus(TimerStatus.IDLE);
+
+    // Get current session ID before clearing state
+    const sessionId = currentSession.id;
+
+    try {
+      // First mark the session as cancelled in database
+      await SessionService.updateSession(sessionId, {
+        status: "cancelled",
+        completed: false,
+      });
+
+      // IMPORTANT: Update the local session object in AsyncStorage directly
+      // This ensures even with a fast refresh, the app won't restart the timer
+      const modifiedSession = {
+        ...currentSession,
+        isCompleted: true, // Mark as completed in UI state
+        status: "cancelled", // Add status to UI state
+      };
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.CURRENT_SESSION,
+        JSON.stringify(modifiedSession)
+      );
+
+      // Now clean up all state
+      await SessionService.completeSessionLifecycle(sessionId);
+
+      // Update UI state
+      setCurrentSession(null);
+      setTimerStatus(TimerStatus.IDLE);
+      setIsOvertime(false);
+      isOvertimeRef.current = false;
+
+      // Force a short delay to ensure AsyncStorage operations complete
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      console.log("❗ COMPLETE STATE RESET PERFORMED");
+    } catch (error) {
+      console.error("Error cancelling session:", error);
+    }
   };
 
   // New function to start the next work period in the same session
@@ -689,7 +709,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         startFocusSession,
         pauseSession,
         resumeSession,
-        completeSession,
         startBreakSession,
         cancelSession,
 

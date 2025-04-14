@@ -9,6 +9,7 @@ import {
 } from "@/types/session";
 import { SessionService } from "@/services/SessionService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { usePomodoro } from "@/contexts/AlarmContext";
 
 interface SessionDebugPanelProps {
   visible?: boolean;
@@ -23,6 +24,7 @@ export default function SessionDebugPanel({
     SessionPendingOperation[]
   >([]);
   const [expanded, setExpanded] = useState(false);
+  const { cancelSession } = usePomodoro();
 
   const loadSessionData = async () => {
     try {
@@ -46,6 +48,34 @@ export default function SessionDebugPanel({
       await loadSessionData();
     } catch (error) {
       console.error("Error clearing pending sessions:", error);
+    }
+  };
+
+  const forceCompleteReset = async () => {
+    try {
+      console.log("Force Complete Reset");
+      // 1. Clear all UI state
+      setCurrentSession(null);
+      setCurrentPeriod(null);
+      setPendingOperations([]);
+      setExpanded(false);
+
+      // 2. Clear AsyncStorage session data
+      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_SESSION);
+      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_PERIOD);
+
+      // 3. Reset session service state
+      await SessionService.setCurrentPeriod(null);
+      await SessionService.setCurrentSession(null);
+
+      // 4. Force context reset
+      if (cancelSession) {
+        await cancelSession();
+      }
+
+      console.log("❗ forceCompleteReset: Finished");
+    } catch (error) {
+      console.error("Error during force reset:", error);
     }
   };
 
@@ -100,10 +130,19 @@ export default function SessionDebugPanel({
 
           <TouchableOpacity
             onPress={clearPendingSessions}
-            className="bg-red-500 p-2 rounded"
+            className="bg-red-500 p-2 rounded mb-2"
           >
             <Text className="text-xs text-white text-center">
               Clear Pending Sessions
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={forceCompleteReset}
+            className="bg-red-600 p-2 rounded"
+          >
+            <Text className="text-xs text-white text-center">
+              Reset State / Storage
             </Text>
           </TouchableOpacity>
         </View>

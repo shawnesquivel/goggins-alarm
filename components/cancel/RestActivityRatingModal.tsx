@@ -1,17 +1,14 @@
 import { View, Text, TouchableOpacity, Modal } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import React from "react";
-
+import { usePomodoro } from "@/contexts/AlarmContext";
+import { restActivitiesIcons } from "@/constants/CancelFlowStep";
 interface RestActivityRatingModalProps {
   visible: boolean;
   onClose: () => void;
   onSelectActivity: (activity: string) => void;
   selectedActivity: string | null;
   sessionLabel?: string;
-  isCancelFlow?: boolean;
-  currentSession?: {
-    projectId: string;
-  };
   getProjectName?: (id: string) => string;
 }
 
@@ -24,17 +21,9 @@ export const RestActivityRatingModal: React.FC<
   onSelectActivity,
   selectedActivity,
   sessionLabel = "REST SESSION", // Default label
-  isCancelFlow = false,
-  currentSession,
   getProjectName,
 }) => {
-  const restActivities = [
-    { id: "MOVEMENT", icon: "arrow-right" as const },
-    { id: "REFUEL", icon: "coffee" as const },
-    { id: "SOCIALIZING", icon: "users" as const },
-    { id: "MINDFULNESS", icon: "heart" as const },
-    { id: "SOCIAL MEDIA", icon: "mobile" as const },
-  ];
+  const { currentSession } = usePomodoro();
 
   return (
     <Modal
@@ -63,7 +52,7 @@ export const RestActivityRatingModal: React.FC<
             </>
           )}
 
-          {restActivities.map(({ id, icon }) => (
+          {restActivitiesIcons.map(({ id, icon }) => (
             <TouchableOpacity
               key={id}
               className={`py-3 px-4 mb-3 rounded-md ${
