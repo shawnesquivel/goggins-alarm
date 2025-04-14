@@ -364,84 +364,47 @@ export const ProjectService = {
         return await this.getLocalProjects();
       }
 
+      // Get authenticated user
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData?.user) {
+        throw new Error("No authenticated user found");
+      }
+
       // Process pending operations first
       const pendingOps = await this.getPendingOperations();
       if (pendingOps.length > 0) {
         await this.processPendingOperationsWithRetry(pendingOps);
       }
 
-      // Fetch remote projects
+      // Fetch remote projects for the current user
       const { data: remoteProjects, error } = await supabase
         .from("projects")
-        .select("*");
+        .select("*")
+        .eq("user_id", authData.user.id);
 
       if (error) throw error;
       if (!remoteProjects) return [];
 
+      console.log("Remote projects:", remoteProjects);
+
       // Get current local projects
       const localProjects = await this.getLocalProjects();
+      console.log("Local projects before sync:", localProjects);
 
-      // Build lookup maps for faster access
-      const localProjectMap = new Map(
-        localProjects.map((project) => [project.id, project])
-      );
-
-      const remoteProjectMap = new Map(
-        remoteProjects.map((project) => [
-          project.id,
-          {
-            id: project.id,
-            name: project.name,
-            goal: project.goal,
-            color: project.color,
-            createdAt: new Date(project.created_at),
-            updatedAt: new Date(project.updated_at),
-          },
-        ])
-      );
-
-      // Merge projects with timestamp-based conflict resolution
-      const mergedProjects: Project[] = [];
-
-      // Add all remote projects
-      for (const [id, remoteProject] of remoteProjectMap.entries()) {
-        const localProject = localProjectMap.get(id);
-
-        if (!localProject) {
-          // Project exists only remotely, add it locally
-          mergedProjects.push(remoteProject);
-        } else {
-          // Project exists in both places, use the one with the most recent update
-          const localUpdateTime = localProject.updatedAt.getTime();
-          const remoteUpdateTime = remoteProject.updatedAt.getTime();
-
-          mergedProjects.push(
-            localUpdateTime > remoteUpdateTime ? localProject : remoteProject
-          );
-        }
-      }
-
-      // Add local projects that don't exist remotely
-      for (const [id, localProject] of localProjectMap.entries()) {
-        if (!remoteProjectMap.has(id)) {
-          mergedProjects.push(localProject);
-
-          // Add to pending operations queue to push to remote
-          await this.addPendingOperation({
-            type: "insert",
-            data: localProject,
-            timestamp: Date.now(),
-          });
-          console.log(
-            `Added local-only project to pending operations: ${localProject.name}`
-          );
-        }
-      }
+      // Replace local projects with remote projects
+      const mergedProjects = remoteProjects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        goal: project.goal,
+        color: project.color,
+        createdAt: new Date(project.created_at),
+        updatedAt: new Date(project.updated_at),
+      }));
 
       // Save merged result to local storage
       await this.saveLocalProjects(mergedProjects);
 
-      console.log(`Synced and merged ${mergedProjects.length} projects`);
+      console.log("Synced projects:", mergedProjects);
       return mergedProjects;
     } catch (error) {
       console.warn("Project sync failed:", error);

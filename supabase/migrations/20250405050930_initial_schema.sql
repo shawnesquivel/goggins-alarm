@@ -40,8 +40,7 @@ CREATE TABLE IF NOT EXISTS public.sessions (
   cancelled_reason TEXT, -- Only if cancelled
   completed BOOLEAN DEFAULT false, -- Ref: 1.6.7.3 - Track completion status
   user_notes TEXT, -- Ref: 1.6.8.2 - Optional notes for the entire session
-  distraction_reasons_selected TEXT[], -- Ref: 1.6.1.3.1.2 - Reasons for ending early
-  cancelled_reasons TEXT[] -- Ref: 1.6.1.3.1.2 - Reasons for cancellation
+  distraction_reasons_selected TEXT[], -- Ref: 1.6.1.3.1.2 - Single reasons for ending early
 );
 
 -- Unified periods table for both work and rest
@@ -56,7 +55,6 @@ CREATE TABLE IF NOT EXISTS public.periods (
   ended_at TIMESTAMP WITH TIME ZONE,
   quality_rating INTEGER CHECK (quality_rating IS NULL OR (quality_rating BETWEEN 1 AND 5)), -- Ref: 1.6.1.3.2.1
   rest_activities_selected TEXT[], -- Ref: 1.6.3.2 - Activities during rest
-  user_notes TEXT, -- Ref: 1.6.3.4 - Notes about distractions or rest activities
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   last_updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
@@ -83,62 +81,6 @@ CREATE TABLE IF NOT EXISTS public.revenuecat_errors (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
 );
 
-
-
--- Create function to handle RevenueCat webhook data
-CREATE OR REPLACE FUNCTION public.handle_revenuecat_webhook(webhook_data JSONB)
-RETURNS void AS $$
-DECLARE
-  user_uuid UUID;
-  event_type TEXT;
-BEGIN
-  -- Extract values for easier reference
-  user_uuid := (webhook_data->'event'->>'app_user_id')::UUID;
-  event_type := webhook_data->'event'->>'type';
-  
-  -- Check if the user exists
-  IF NOT EXISTS (SELECT 1 FROM public.users WHERE id = user_uuid) THEN
-    -- Log the error if user doesn't exist but we got a webhook for them
-    INSERT INTO public.revenuecat_errors (
-      user_id, 
-      event_type, 
-      error_message, 
-      payload
-    )
-    VALUES (
-      user_uuid, 
-      event_type, 
-      'User not found in database', 
-      jsonb_build_object('event_type', event_type, 'user_id', user_uuid)
-    );
-    RETURN;
-  END IF;
-
-  -- Update user premium status based on webhook payload
-  BEGIN
-    UPDATE public.users
-    SET 
-      is_premium = (event_type IN ('INITIAL_PURCHASE', 'RENEWAL') 
-                    AND (webhook_data->'event'->>'expiration_at_ms')::bigint > (EXTRACT(EPOCH FROM NOW()) * 1000)::bigint),
-      updated_at = NOW()
-    WHERE id = user_uuid;
-  EXCEPTION WHEN OTHERS THEN
-    -- Log any errors during the update process
-    INSERT INTO public.revenuecat_errors (
-      user_id, 
-      event_type, 
-      error_message, 
-      payload
-    )
-    VALUES (
-      user_uuid, 
-      event_type, 
-      'Error updating user subscription: ' || SQLERRM, 
-      jsonb_build_object('event_type', event_type, 'user_id', user_uuid)
-    );
-  END;
-END;
-$$ LANGUAGE plpgsql;
 
 -- Add Row Level Security (RLS) policies
 
@@ -235,10 +177,7 @@ CREATE POLICY "Users can insert their own error reports"
   ON public.app_errors FOR INSERT 
   WITH CHECK (auth.uid() = user_id);
 
--- RevenueCat errors policies (only service role can access)
-CREATE POLICY "Only service role can access RevenueCat errors" 
-  ON public.revenuecat_errors
-  USING (auth.role() = 'service_role');
+
 
 -- Create indexes for performance
 CREATE INDEX idx_periods_session_id ON public.periods(session_id);

@@ -597,8 +597,6 @@ export default function TimerScreen() {
       className="flex-1 bg-white"
       contentContainerStyle={{ padding: 20 }}
     >
-      <AuthDebugPanel />
-      <SessionDebugPanel />
       <Overview />
 
       {/* Home Page Timer Display */}
@@ -745,6 +743,9 @@ export default function TimerScreen() {
           durationInMinutes={currentSession?.duration || 0}
         />
       )}
+
+      <SessionDebugPanel />
+      <AuthDebugPanel />
     </ScrollView>
   );
 }

@@ -70,8 +70,6 @@ export const AnalyticsService = {
       .filter((p) => p.type === "work" && p.work_time_completed === true)
       .reduce((sum, p) => sum + (p.actual_duration_minutes || 0), 0);
 
-    // Similar for rest periods...
-
     // Format total deep work time
     const hours = Math.floor(workMinutes / 60);
     const minutes = Math.floor(workMinutes % 60);
@@ -107,8 +105,154 @@ export const AnalyticsService = {
     };
   },
 
+  async getRestStats(timeframe: "day" | "week" | "month" = "week"): Promise<{
+    totalSessions: number;
+    totalMinutes: number;
+  }> {
+    // Get date range based on timeframe
+    const now = new Date();
+    let startDate = new Date();
+
+    switch (timeframe) {
+      case "day":
+        startDate.setDate(now.getDate() - 1);
+        break;
+      case "week":
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case "month":
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+    }
+
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData?.user) return { totalSessions: 0, totalMinutes: 0 };
+
+      // Query sessions table directly for rest periods
+      const { data: sessions } = await supabase
+        .from("sessions")
+        .select("total_deep_rest_minutes")
+        .eq("user_id", authData.user.id)
+        .eq("status", "completed")
+        .gt("total_deep_rest_minutes", 0)
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", now.toISOString());
+
+      if (!sessions) return { totalSessions: 0, totalMinutes: 0 };
+
+      console.log("Rest sessions:", sessions);
+
+      const totalMinutes = sessions.reduce(
+        (sum, session) =>
+          sum + (parseFloat(session.total_deep_rest_minutes) || 0),
+        0
+      );
+
+      return {
+        totalSessions: sessions.length,
+        totalMinutes: Math.round(totalMinutes),
+      };
+    } catch (error) {
+      console.error("Error getting rest stats:", error);
+      return { totalSessions: 0, totalMinutes: 0 };
+    }
+  },
+
   async forceRefresh(): Promise<void> {
     // Force sync local data to Supabase first
     await SessionService.syncToSupabase(true);
+  },
+
+  async getProjectTimeStats(
+    timeframe: "day" | "week" | "month" = "week"
+  ): Promise<
+    {
+      projectId: string;
+      name: string;
+      color: string;
+      totalMinutes: number;
+    }[]
+  > {
+    // Get date range based on timeframe
+    const now = new Date();
+    let startDate = new Date();
+
+    switch (timeframe) {
+      case "day":
+        startDate.setDate(now.getDate() - 1);
+        break;
+      case "week":
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case "month":
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+    }
+
+    // Get authenticated user
+    const { data: authData } = await supabase.auth.getUser();
+    if (!authData?.user) return [];
+
+    try {
+      // Get project stats directly from sessions table
+      const { data: projectStats } = await supabase
+        .from("sessions")
+        .select(
+          `
+          project_id,
+          total_deep_work_minutes,
+          projects (
+            name,
+            color
+          )
+        `
+        )
+        .eq("user_id", authData.user.id)
+        .eq("status", "completed")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", now.toISOString());
+
+      if (!projectStats) return [];
+
+      console.log("Raw session stats:", projectStats);
+
+      // Aggregate by project
+      const aggregatedStats = projectStats.reduce(
+        (acc, session) => {
+          if (!session.project_id || !session.projects) return acc;
+
+          if (!acc[session.project_id]) {
+            acc[session.project_id] = {
+              projectId: session.project_id,
+              name: session.projects.name,
+              color: session.projects.color,
+              totalMinutes: 0,
+            };
+          }
+
+          acc[session.project_id].totalMinutes +=
+            parseFloat(session.total_deep_work_minutes) || 0;
+
+          return acc;
+        },
+        {} as Record<
+          string,
+          {
+            projectId: string;
+            name: string;
+            color: string;
+            totalMinutes: number;
+          }
+        >
+      );
+
+      console.log("Aggregated project stats:", aggregatedStats);
+
+      return Object.values(aggregatedStats);
+    } catch (error) {
+      console.error("Error fetching project stats:", error);
+      return [];
+    }
   },
 };

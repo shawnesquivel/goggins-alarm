@@ -12,6 +12,7 @@ import { Project } from "@/types/project";
 import ProjectModal from "@/components/shared/modals/ProjectModal";
 import DeleteConfirmationModal from "@/components/shared/modals/DeleteConfirmationModal";
 import { ProjectService } from "@/services/ProjectService";
+import ProjectDebugPanel from "@/components/debug/ProjectDebugPanel";
 
 export default function ProjectsScreen() {
   const {
@@ -148,34 +149,13 @@ export default function ProjectsScreen() {
               </Text>
             </TouchableOpacity>
 
-            {/* Debug Panel - Always visible regardless of __DEV__ */}
-            <View className="mt-4 p-3 bg-gray-100 rounded-md border border-gray-300">
-              <Text className="text-sm font-bold mb-2">
-                Project Debug Panel
-              </Text>
-              <Text className="text-xs mb-1">
-                Pending Ops: {pendingOps.length} ({errorCount} potential
-                duplicates)
-              </Text>
-              {pendingOps.slice(0, 3).map((op, i) => (
-                <Text key={i} className="text-xs text-gray-600 mb-1">
-                  {op.type}: {op.data?.name || op.data?.id || "unknown"}
-                </Text>
-              ))}
-              {pendingOps.length > 3 && (
-                <Text className="text-xs text-gray-600 mb-2">
-                  ...and {pendingOps.length - 3} more
-                </Text>
-              )}
-              <TouchableOpacity
-                className="bg-red-500 py-2 rounded-md items-center mt-2"
-                onPress={clearPendingOperations}
-              >
-                <Text className="text-white font-medium text-sm">
-                  Clear All Pending Operations
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {__DEV__ && (
+              <ProjectDebugPanel
+                pendingOps={pendingOps}
+                errorCount={errorCount}
+                clearPendingOperations={clearPendingOperations}
+              />
+            )}
 
             {/* Project Modal */}
             <ProjectModal

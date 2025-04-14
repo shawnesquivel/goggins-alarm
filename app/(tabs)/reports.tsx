@@ -4,8 +4,9 @@ import { usePomodoro } from "@/contexts/AlarmContext";
 import { useProjects } from "@/contexts/ProjectContext";
 import { PomodoroSession } from "@/types/alarm";
 import { ProjectPieChart } from "../../components/charts/ProjectPieChart";
-import { format, startOfWeek, addWeeks, subWeeks } from "date-fns";
+import { format, startOfWeek } from "date-fns";
 import { WeekPicker } from "../../components/WeekPicker";
+import { AnalyticsService } from "@/services/AnalyticsService";
 import {
   LibreBaskerville_400Regular,
   LibreBaskerville_400Regular_Italic,
@@ -75,72 +76,23 @@ export default function ReportsScreen() {
       }
 
       setProjectStats(stats);
+
+      // Fetch and log project time stats
+      const projectTimeStats = await AnalyticsService.getProjectTimeStats(
+        selectedPeriod
+      );
+      console.log("Raw Project Time Stats:", projectTimeStats);
+      console.log("Number of projects found:", projectTimeStats.length);
+      projectTimeStats.forEach((stat) => {
+        console.log(
+          `Project: ${stat.name} (${stat.projectId}) - ${stat.totalMinutes} minutes`
+        );
+      });
     } catch (error) {
       console.error("Error loading reports data:", error);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const formatTime = (minutes: number): string => {
-    const hours = Math.floor(minutes / 60);
-    const mins = Math.round(minutes % 60);
-    return `${hours}h ${mins}m`;
-  };
-
-  const getProjectName = (projectId: string): string => {
-    const project = projects.find((p) => p.id === projectId);
-    return project ? project.name : "Unknown Project";
-  };
-
-  const getPeriodTotal = () => {
-    switch (selectedPeriod) {
-      case "day":
-        return totalToday;
-      case "week":
-        return totalWeek;
-      case "month":
-        return totalMonth;
-      default:
-        return 0;
-    }
-  };
-
-  // Filter sessions based on selected period
-  const getFilteredSessions = (): PomodoroSession[] => {
-    const now = new Date();
-    let cutoffDate = new Date();
-
-    switch (selectedPeriod) {
-      case "day":
-        cutoffDate.setDate(now.getDate() - 1);
-        break;
-      case "week":
-        cutoffDate.setDate(now.getDate() - 7);
-        break;
-      case "month":
-        cutoffDate.setMonth(now.getMonth() - 1);
-        break;
-    }
-
-    return sessionHistory
-      .filter(
-        (session) =>
-          session.type === "focus" &&
-          session.isCompleted &&
-          new Date(session.startTime) >= cutoffDate
-      )
-      .sort(
-        (a, b) =>
-          new Date(b.startTime).getTime() - new Date(a.startTime).getTime()
-      );
-  };
-
-  // Function to handle week selection
-  const handleWeekChange = (direction: "next" | "prev") => {
-    setSelectedWeek((current) =>
-      direction === "next" ? addWeeks(current, 1) : subWeeks(current, 1)
-    );
   };
 
   // Format the week display
