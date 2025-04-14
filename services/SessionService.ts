@@ -57,6 +57,7 @@ export const SessionService: SessionServiceInterface = {
     // Get existing session
     const session = await this.getSession(sessionId);
     if (!session) {
+      console.warn(`Session not found: ${sessionId}`);
       throw new Error(`Session not found: ${sessionId}`);
     }
 
@@ -84,16 +85,17 @@ export const SessionService: SessionServiceInterface = {
     }
 
     // Queue for syncing
-    await this.addPendingOperation({
+    const pendingOp: SessionPendingOperation = {
       type: "update_session",
+      id: session.id,
       data: {
         id: sessionId,
         ...sessionData,
-        distraction_reasons_selected: sessionData.distraction_reasons_selected,
         last_updated_at: updatedSession.last_updated_at,
       },
       timestamp: Date.now(),
-    });
+    };
+    await this.addPendingOperation(pendingOp);
 
     return updatedSession;
   },
@@ -170,11 +172,10 @@ export const SessionService: SessionServiceInterface = {
     periodData: DbPeriodUpdate,
     skipTotals: boolean = false
   ): Promise<DbPeriod> {
-    console.log("SessionService: Updating period", periodId, periodData);
-
     // Get existing period
     const period = await this.getPeriod(periodId);
     if (!period) {
+      console.warn(`Period not found: ${periodId}`);
       throw new Error(`Period not found: ${periodId}`);
     }
 
@@ -186,12 +187,6 @@ export const SessionService: SessionServiceInterface = {
     ) {
       periodData.work_time_completed =
         periodData.actual_duration_minutes >= period.planned_duration_minutes;
-
-      console.log(
-        "SessionService: Setting work_time_completed =",
-        periodData.work_time_completed,
-        `(${periodData.actual_duration_minutes} >= ${period.planned_duration_minutes})`
-      );
     }
 
     // Update period data
@@ -362,13 +357,10 @@ export const SessionService: SessionServiceInterface = {
 
   // Sync operations
   async syncToSupabase(force: boolean = false): Promise<boolean> {
-    console.log("SessionService: Syncing to Supabase, force=", force);
-
     try {
       const pendingOps = await this.getPendingOperations();
 
       if (pendingOps.length === 0 && !force) {
-        console.log("SessionService: No pending operations to sync");
         return true;
       }
 
@@ -377,7 +369,7 @@ export const SessionService: SessionServiceInterface = {
       const user = authData?.user;
 
       if (!user) {
-        console.log("SessionService: No authenticated user, aborting sync");
+        console.warn("No authenticated user, aborting sync");
         return false;
       }
 
@@ -386,17 +378,10 @@ export const SessionService: SessionServiceInterface = {
         try {
           if (op.type === "insert_session") {
             const sessionData = op.data as DbSessionInsert;
-
-            // Add user_id
             const sessionWithUser = {
               ...sessionData,
               user_id: user.id,
             };
-
-            console.log(
-              "SessionService: Inserting session to Supabase",
-              sessionWithUser.id
-            );
 
             const { error } = await supabase
               .from("sessions")
@@ -408,12 +393,6 @@ export const SessionService: SessionServiceInterface = {
             }
           } else if (op.type === "update_session") {
             const sessionData = op.data as DbSessionUpdate;
-
-            console.log(
-              "SessionService: Updating session in Supabase",
-              sessionData.id
-            );
-
             const { error } = await supabase
               .from("sessions")
               .update(sessionData)
@@ -425,12 +404,6 @@ export const SessionService: SessionServiceInterface = {
             }
           } else if (op.type === "insert_period") {
             const periodData = op.data as DbPeriodInsert;
-
-            console.log(
-              "SessionService: Inserting period to Supabase",
-              periodData.id
-            );
-
             const { error } = await supabase.from("periods").insert(periodData);
 
             if (error) {
@@ -439,12 +412,6 @@ export const SessionService: SessionServiceInterface = {
             }
           } else if (op.type === "update_period") {
             const periodData = op.data as DbPeriodUpdate;
-
-            console.log(
-              "SessionService: Updating period in Supabase",
-              periodData.id
-            );
-
             const { error } = await supabase
               .from("periods")
               .update(periodData)
@@ -465,10 +432,11 @@ export const SessionService: SessionServiceInterface = {
 
       // Check if all operations were processed
       const remainingOps = await this.getPendingOperations();
-
-      console.log(
-        `SessionService: Sync completed. Remaining operations: ${remainingOps.length}`
-      );
+      if (remainingOps.length > 0) {
+        console.warn(
+          `Sync incomplete. ${remainingOps.length} operations remaining`
+        );
+      }
 
       return remainingOps.length === 0;
     } catch (error) {
@@ -540,22 +508,8 @@ export const SessionService: SessionServiceInterface = {
       const periodSeconds = period.actual_duration_minutes * 60;
       if (period.type === "work") {
         totalWorkSeconds += periodSeconds;
-        console.log(
-          `SessionService: Adding work period: ${
-            period.id
-          }, duration: ${periodSeconds}s (${
-            period.actual_duration_minutes
-          }min), new total: ${totalWorkSeconds}s (${totalWorkSeconds / 60}min)`
-        );
       } else if (period.type === "rest") {
         totalRestSeconds += periodSeconds;
-        console.log(
-          `SessionService: Adding rest period: ${
-            period.id
-          }, duration: ${periodSeconds}s (${
-            period.actual_duration_minutes
-          }min), new total: ${totalRestSeconds}s (${totalRestSeconds / 60}min)`
-        );
       }
     }
 
@@ -568,10 +522,6 @@ export const SessionService: SessionServiceInterface = {
       total_deep_work_minutes: totalWorkMinutes,
       total_deep_rest_minutes: totalRestMinutes,
     });
-
-    console.log(
-      `SessionService: FINAL TOTALS for Session ${sessionId} - Deep Work: ${totalWorkSeconds}s (${totalWorkMinutes}min), Deep Rest: ${totalRestSeconds}s (${totalRestMinutes}min)`
-    );
 
     return {
       total_deep_work_minutes: totalWorkMinutes,

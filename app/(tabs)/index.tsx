@@ -10,16 +10,14 @@ import {
 } from "@expo-google-fonts/libre-caslon-text";
 import { useAuth } from "@/contexts/AuthContext";
 import SessionDebugPanel from "@/components/debug/SessionDebugPanel";
-import { format } from "date-fns";
 import { ExportModal } from "@/components/shared/modals/ExportModal";
 import { HeaderRight } from "@/components/shared/HeaderRight";
 import { SessionService } from "@/services/SessionService";
-import useAnalytics from "@/app/hooks/useAnalytics";
 import Overview from "@/components/cycle/Overview";
 import AuthDebugPanel from "@/components/debug/AuthDebugPanel";
 import EndEarlyModal from "@/components/cancel/EndEarlyModal";
 import { CancelFlowStep } from "@/constants/CancelFlowStep";
-import { formatTimeDisplay, formatDurationForExport } from "@/lib/time";
+import { formatTimeDisplay } from "@/lib/time";
 import WorkToRestBtn from "@/components/cycle/WorkToRestBtn";
 import RestToWorkBtn from "@/components/cycle/RestToWorkBtn";
 import EndCycleEarlyBtn from "@/components/cycle/EndCycleEarlyBtn";
@@ -67,7 +65,6 @@ export default function TimerScreen() {
     CancelFlowStep.NONE
   );
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
-  const { analytics, isAnalyticsLoading, handleRefresh } = useAnalytics();
 
   // Add effect to calculate session times when reaching SESSION_COMPLETE step
   useEffect(() => {
@@ -130,7 +127,7 @@ export default function TimerScreen() {
 
       // Check if session is already completed or cancelled
       if (!currentPeriod || !dbSession) {
-        console.log("Session or period not found, already cleaned up");
+        console.warn("Session or period not found, already cleaned up");
         setShowRatingModal(false);
         return;
       }
@@ -139,7 +136,7 @@ export default function TimerScreen() {
         dbSession.status === "completed" ||
         dbSession.status === "cancelled"
       ) {
-        console.log("Session already", dbSession.status);
+        console.warn("Session already", dbSession.status);
         setShowRatingModal(false);
         return;
       }
@@ -151,20 +148,20 @@ export default function TimerScreen() {
         (endTime.getTime() - startTime.getTime()) / 1000
       );
 
-      // Use the direct rating parameter instead of state
-      console.log(
-        "Updating period from handleSubmitWorkPeriodReflectionWithRating"
-      );
       await SessionService.updatePeriod(
         currentPeriod.id,
         {
           actual_duration_minutes: actualSeconds / 60,
           ended_at: new Date().toISOString(),
           quality_rating: rating,
-          user_notes: sessionNotes || null,
         },
         true
       );
+
+      // Update session with notes
+      await SessionService.updateSession(currentSession.id, {
+        user_notes: sessionNotes || null,
+      });
 
       // Close rating modal and clean up state
       setShowRatingModal(false);
@@ -193,7 +190,7 @@ export default function TimerScreen() {
 
       // Check if session is already completed or cancelled
       if (!currentPeriod || !dbSession) {
-        console.log("Session or period not found, already cleaned up");
+        console.warn("Session or period not found, already cleaned up");
         setShowBreakRatingModal(false);
         return;
       }
@@ -202,7 +199,7 @@ export default function TimerScreen() {
         dbSession.status === "completed" ||
         dbSession.status === "cancelled"
       ) {
-        console.log("Session already", dbSession.status);
+        console.warn("Session already", dbSession.status);
         setShowBreakRatingModal(false);
         return;
       }
@@ -217,14 +214,12 @@ export default function TimerScreen() {
       // Keep as array with single element to match DB schema
       const activityArray = [activity];
 
-      // Update period with rest activity
-      console.log("Updating period from submitRestPeriodWithActivity");
       await SessionService.updatePeriod(
         currentPeriod.id,
         {
           actual_duration_minutes: actualSeconds / 60,
           ended_at: new Date().toISOString(),
-          rest_activities_selected: activityArray, // Single element array
+          rest_activities_selected: activityArray,
         },
         true
       );
@@ -234,7 +229,6 @@ export default function TimerScreen() {
       setSelectedRestActivity(null);
 
       // Complete rest period and CONTINUE to next work period
-      // Normal flow - always start next work period
       completeRestPeriod(activityArray, true);
     } catch (error) {
       console.error("Error updating session for rest reflection:", error);
@@ -267,8 +261,6 @@ export default function TimerScreen() {
         // Keep as array with single element to match DB schema
         const activityArray = [activity];
 
-        // Update period with duration and activity
-        console.log("Updating period from handleCancelFlowRestRating");
         await SessionService.updatePeriod(
           currentPeriod.id,
           {
@@ -280,7 +272,6 @@ export default function TimerScreen() {
         );
 
         // For the cancel flow, we DO NOT call completeRestPeriod with startNewWork=true
-        // Instead we just handle the UI update without starting a new work period
         await completeRestPeriod(activityArray, false);
       }
     } catch (error) {
@@ -293,7 +284,6 @@ export default function TimerScreen() {
 
   // Update existing handler
   const handleCancelSession = () => {
-    console.log("Starting cancel flow with task completion check");
     setCancelFlowStep(CancelFlowStep.TASK_COMPLETE);
   };
 
@@ -485,7 +475,7 @@ export default function TimerScreen() {
 
       // Early return conditions - just log and let finally block handle cleanup
       if (!currentPeriod || !dbSession) {
-        console.log("Session or period not found, already cleaned up");
+        console.warn("Session or period not found, already cleaned up");
         return;
       }
 
@@ -493,7 +483,7 @@ export default function TimerScreen() {
         dbSession.status === "completed" ||
         dbSession.status === "cancelled"
       ) {
-        console.log("Session already", dbSession.status);
+        console.warn("Session already", dbSession.status);
         return;
       }
 
@@ -504,8 +494,6 @@ export default function TimerScreen() {
         (endTime.getTime() - startTime.getTime()) / 1000
       );
 
-      // Update period with reflection data
-      console.log("Updating period from completeSessionWithReflection");
       await SessionService.updatePeriod(
         currentPeriod.id,
         {
@@ -516,7 +504,6 @@ export default function TimerScreen() {
             ? [options.activity]
             : null,
           work_time_completed: options.isTaskComplete,
-          user_notes: options.notes || null,
         },
         true
       );
