@@ -10,8 +10,6 @@ interface EndEarlyModalProps {
   // Flow Control
   setCancelFlowStep: (step: CancelFlowStep) => void;
   step: CancelFlowStep;
-  showBreakRatingModal: boolean;
-  setShowBreakRatingModal: (show: boolean) => void;
 
   // Task State
   isTaskComplete: boolean;
@@ -59,8 +57,6 @@ const EndEarlyModal = ({
   deepRestTime,
   isNoteExpanded,
   sessionNotes,
-  showBreakRatingModal,
-  setShowBreakRatingModal,
 }: EndEarlyModalProps) => {
   switch (step) {
     case CancelFlowStep.TASK_COMPLETE:
@@ -92,7 +88,6 @@ const EndEarlyModal = ({
     case CancelFlowStep.RATE_FOCUS:
       return (
         <FocusRatingModal
-          visible={true}
           onClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
           onSubmitRating={handleCancelFlowFocusRating}
           starRating={starRating}
@@ -103,7 +98,6 @@ const EndEarlyModal = ({
     case CancelFlowStep.RATE_REST:
       return (
         <RestActivityRatingModal
-          visible={true}
           onClose={() => setCancelFlowStep(CancelFlowStep.NONE)}
           onSelectActivity={handleCancelFlowRestRating}
           selectedActivity={selectedRestActivity}

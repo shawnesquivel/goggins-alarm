@@ -25,3 +25,14 @@ export const formatTimeDisplay = (
     .padStart(2, "0")}`;
   return `${isOvertime ? "+" : ""}${timeString}`;
 };
+
+/**
+ * Formats duration for sharing/export in hours and minutes
+ * @param seconds - Total number of seconds
+ * @returns Formatted duration string (e.g. "2h 30m")
+ */
+export const formatDurationForExport = (seconds: number): string => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${minutes}m`;
+};

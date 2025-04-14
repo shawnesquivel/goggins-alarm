@@ -3,7 +3,6 @@ import { FontAwesome } from "@expo/vector-icons";
 import { TouchableOpacity, View, Text, Modal } from "react-native";
 
 interface FocusRatingModalProps {
-  visible: boolean;
   onClose: () => void;
   onSubmitRating: (rating: number) => void;
   starRating: number | null;
@@ -11,7 +10,6 @@ interface FocusRatingModalProps {
 }
 
 const FocusRatingModal = ({
-  visible,
   onClose,
   onSubmitRating,
   starRating,
@@ -21,9 +19,9 @@ const FocusRatingModal = ({
 
   return (
     <Modal
-      visible={visible}
       animationType="slide"
       transparent={true}
+      visible={true}
       onRequestClose={onClose}
     >
       <View className="flex-1 bg-white justify-center items-center">

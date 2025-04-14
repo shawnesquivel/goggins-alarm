@@ -19,12 +19,13 @@ import Overview from "@/components/cycle/Overview";
 import AuthDebugPanel from "@/components/debug/AuthDebugPanel";
 import EndEarlyModal from "@/components/cancel/EndEarlyModal";
 import { CancelFlowStep } from "@/constants/CancelFlowStep";
-import { formatTimeDisplay } from "@/lib/time";
+import { formatTimeDisplay, formatDurationForExport } from "@/lib/time";
 import WorkToRestBtn from "@/components/cycle/WorkToRestBtn";
 import RestToWorkBtn from "@/components/cycle/RestToWorkBtn";
 import EndCycleEarlyBtn from "@/components/cycle/EndCycleEarlyBtn";
 import { RestActivityRatingModal } from "@/components/shared/modals/RestActivityRatingModal";
 import FocusRatingModal from "@/components/shared/modals/FocusRatingModal";
+import OvertimeInfo from "@/components/cycle/OvertimeInfo";
 
 export default function TimerScreen() {
   const navigation = useNavigation();
@@ -380,18 +381,10 @@ export default function TimerScreen() {
 
           {/* Overtime info */}
           {isOvertime && (
-            <>
-              <Text className="text-sm font-medium text-black mb-1 flex-row items-center">
-                <FontAwesome name="check" size={12} color="#000" /> YOU HIT YOUR
-                GOAL OF {currentSession?.duration} MIN
-              </Text>
-              <Text className="text-sm text-gray-600 mb-4">
-                TIME ELAPSED: {Math.floor(currentSession?.duration || 0)}:
-                {(((currentSession?.duration || 0) % 1) * 60)
-                  .toFixed(0)
-                  .padStart(2, "0")}
-              </Text>
-            </>
+            <OvertimeInfo
+              duration={currentSession?.duration || 0}
+              remainingSeconds={remainingSeconds}
+            />
           )}
 
           {/* Action Buttons */}
@@ -434,13 +427,6 @@ export default function TimerScreen() {
   };
 
   if (!fontsLoaded) return null;
-
-  // Helper function for formatting duration in export
-  const formatDurationForExport = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
-  };
 
   const handleCancelFlowFocusRating = async (rating: number) => {
     if (!currentSession) return;
@@ -670,19 +656,10 @@ export default function TimerScreen() {
 
             {/* Overtime info */}
             {isOvertime && (
-              <>
-                <Text className="text-sm font-medium text-black mb-1 flex-row items-center">
-                  <FontAwesome name="check" size={12} color="#000" /> YOU HIT
-                  YOUR GOAL OF {currentSession.duration} MIN
-                </Text>
-                <Text className="text-sm text-gray-600 mb-8">
-                  TIME ELAPSED: {Math.floor(currentSession.duration)}:
-                  {((currentSession.duration % 1) * 60)
-                    .toFixed(0)
-                    .padStart(2, "0")}
-                  {remainingSeconds > 0 ? `:${remainingSeconds}` : ""}
-                </Text>
-              </>
+              <OvertimeInfo
+                duration={currentSession?.duration || 0}
+                remainingSeconds={remainingSeconds}
+              />
             )}
 
             {/* Cycle between work and rest depending on the session type */}
@@ -733,21 +710,23 @@ export default function TimerScreen() {
       />
 
       {/* Rating Modals for normal flow */}
-      <FocusRatingModal
-        visible={showRatingModal}
-        onClose={() => setShowRatingModal(false)}
-        onSubmitRating={handleSubmitWithRating}
-        starRating={starRating}
-        mode="normal"
-      />
+      {showRatingModal && (
+        <FocusRatingModal
+          onClose={() => setShowRatingModal(false)}
+          onSubmitRating={handleSubmitWithRating}
+          starRating={starRating}
+          mode="normal"
+        />
+      )}
 
-      <RestActivityRatingModal
-        visible={showBreakRatingModal}
-        onClose={() => setShowBreakRatingModal(false)}
-        onSelectActivity={submitRestPeriodWithActivity}
-        selectedActivity={selectedRestActivity}
-        mode="normal"
-      />
+      {showBreakRatingModal && (
+        <RestActivityRatingModal
+          onClose={() => setShowBreakRatingModal(false)}
+          onSelectActivity={submitRestPeriodWithActivity}
+          selectedActivity={selectedRestActivity}
+          mode="normal"
+        />
+      )}
 
       {/* End Early Modal */}
       <EndEarlyModal
@@ -769,20 +748,16 @@ export default function TimerScreen() {
         deepRestTime={deepRestTime}
         isNoteExpanded={isNoteExpanded}
         sessionNotes={sessionNotes}
-        showBreakRatingModal={showBreakRatingModal}
-        setShowBreakRatingModal={setShowBreakRatingModal}
       />
 
       {/* Export Modal */}
-      <ExportModal
-        visible={showExportModal}
-        onClose={() => setShowExportModal(false)}
-        userName={session?.user?.email?.split("@")[0] || "User"}
-        deepWorkTime={formatDurationForExport(
-          Math.floor(currentSession?.duration || 0) * 60
-        )}
-        date={format(new Date(), "EEE, MMM d")}
-      />
+      {showExportModal && (
+        <ExportModal
+          onClose={() => setShowExportModal(false)}
+          userName={session?.user?.email?.split("@")[0] || "User"}
+          durationInMinutes={currentSession?.duration || 0}
+        />
+      )}
     </ScrollView>
   );
 }

@@ -1,11 +1,9 @@
 import { View, Text, TouchableOpacity, Modal } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 import React from "react";
-import { usePomodoro } from "@/contexts/AlarmContext";
 import { restActivitiesIcons } from "@/constants/CancelFlowStep";
 
 interface RestActivityRatingModalProps {
-  visible: boolean;
   onClose: () => void;
   onSelectActivity: (activity: string) => void;
   selectedActivity: string | null;
@@ -14,14 +12,12 @@ interface RestActivityRatingModalProps {
 
 export const RestActivityRatingModal: React.FC<
   RestActivityRatingModalProps
-> = ({ visible, onClose, onSelectActivity, selectedActivity, mode }) => {
-  const { currentSession } = usePomodoro();
-
+> = ({ onClose, onSelectActivity, selectedActivity, mode }) => {
   return (
     <Modal
-      visible={visible}
       animationType="slide"
       transparent={true}
+      visible={true}
       onRequestClose={onClose}
     >
       <View className="flex-1 bg-black/50 justify-center items-center">
