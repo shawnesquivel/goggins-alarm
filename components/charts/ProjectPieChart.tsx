@@ -8,6 +8,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/libre-caslon-text";
 import { AnalyticsService } from "@/services/AnalyticsService";
+import { startOfWeek, endOfWeek } from "date-fns";
 
 // Add this helper function to format total time
 const formatTotalTime = (totalMinutes: number) => {
@@ -20,7 +21,11 @@ const formatTotalTime = (totalMinutes: number) => {
   )}:${String(seconds).padStart(2, "0")}`;
 };
 
-export const ProjectPieChart = () => {
+interface ProjectPieChartProps {
+  selectedWeek: Date;
+}
+
+export const ProjectPieChart = ({ selectedWeek }: ProjectPieChartProps) => {
   const [fontsLoaded] = useFonts({
     LibreCaslonText: LibreCaslonText_400Regular,
     "LibreCaslonText-Bold": LibreCaslonText_700Bold,
@@ -43,8 +48,8 @@ export const ProjectPieChart = () => {
   useEffect(() => {
     const fetchData = async () => {
       const [projectStats, restData] = await Promise.all([
-        AnalyticsService.getProjectTimeStats(),
-        AnalyticsService.getRestStats(),
+        AnalyticsService.getProjectTimeStats("week", selectedWeek),
+        AnalyticsService.getRestStats("week", selectedWeek),
       ]);
 
       // Transform stats into the format PieChart expects
@@ -55,6 +60,7 @@ export const ProjectPieChart = () => {
         legendFontColor: "#333",
       }));
 
+      console.log("Selected week:", selectedWeek);
       console.log("Formatted pie chart data:", formattedData);
       console.log("Rest stats:", restData);
 
@@ -63,7 +69,7 @@ export const ProjectPieChart = () => {
     };
 
     fetchData();
-  }, []);
+  }, [selectedWeek]); // Re-fetch when selectedWeek changes
 
   // Center the chart
   const chartConfig = {
@@ -154,14 +160,6 @@ export const ProjectPieChart = () => {
     );
   }
 
-  if (projectData.length === 0) {
-    return (
-      <View className="items-center justify-center bg-[#FAF9F6] rounded-lg p-4">
-        <Text>No project data available</Text>
-      </View>
-    );
-  }
-
   return (
     <View className="flex-1 flex flex-col justify-between bg-[#FAF9F6]">
       {/* Chart Section */}
@@ -175,18 +173,35 @@ export const ProjectPieChart = () => {
 
         {/* Center the chart */}
         <View className="items-center justify-center">
-          <PieChart
-            data={projectData}
-            width={Dimensions.get("window").width - 32}
-            height={220}
-            chartConfig={chartConfig}
-            accessor="population"
-            backgroundColor="transparent"
-            paddingLeft="0"
-            absolute={false}
-            hasLegend={false}
-            center={[Dimensions.get("window").width / 4, 0]}
-          />
+          {projectData.length > 0 ? (
+            <PieChart
+              data={projectData}
+              width={Dimensions.get("window").width - 32}
+              height={220}
+              chartConfig={chartConfig}
+              accessor="population"
+              backgroundColor="transparent"
+              paddingLeft="0"
+              absolute={false}
+              hasLegend={false}
+              center={[Dimensions.get("window").width / 4, 0]}
+            />
+          ) : (
+            <View
+              style={{
+                width: Dimensions.get("window").width - 32,
+                height: 220,
+              }}
+              className="items-center justify-center"
+            >
+              <Text
+                className="text-[#999] text-base"
+                style={{ fontFamily: "Figtree_400Regular" }}
+              >
+                No activity this week
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Total Deep Work Time Display */}
@@ -205,7 +220,7 @@ export const ProjectPieChart = () => {
           </Text>
         </View>
 
-        {renderLegend()}
+        {projectData.length > 0 ? renderLegend() : null}
       </View>
 
       {/* Stats Section */}
@@ -216,7 +231,7 @@ export const ProjectPieChart = () => {
               className="text-4xl text-black mb-1"
               style={{ fontFamily: "LibreCaslonText" }}
             >
-              {projectData.length}
+              {projectData.length || 0}
             </Text>
             <Text
               className="text-sm text-[#333] text-center mb-4 uppercase"
@@ -242,7 +257,7 @@ export const ProjectPieChart = () => {
               className="text-4xl text-black mb-1"
               style={{ fontFamily: "LibreCaslonText" }}
             >
-              {restStats.totalSessions}
+              {restStats.totalSessions || 0}
             </Text>
             <Text
               className="text-sm text-[#333] text-center mb-4 uppercase"
