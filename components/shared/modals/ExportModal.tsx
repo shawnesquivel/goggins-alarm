@@ -4,24 +4,42 @@ import { ShareTemplate } from "./ShareTemplate";
 import { SharePreview } from "./SharePreview";
 import * as MediaLibrary from "expo-media-library";
 import ViewShot, { captureRef } from "react-native-view-shot";
+import { formatDurationForExport } from "@/lib/time";
+import { format } from "date-fns";
 
 interface ExportModalProps {
-  visible: boolean;
   onClose: () => void;
   userName: string;
-  deepWorkTime: string;
-  date: string;
+  durationInMinutes: number;
 }
 
+/**
+ * ExportModal - Modal for sharing deep work sessions
+ *
+ * Usage:
+ * ```tsx
+ * {showExportModal && (
+ *   <ExportModal
+ *     onClose={() => setShowExportModal(false)}
+ *     userName={session?.user?.email?.split("@")[0] || "User"}
+ *     durationInMinutes={currentSession?.duration || 0}
+ *   />
+ * )}
+ * ```
+ */
 export const ExportModal: React.FC<ExportModalProps> = ({
-  visible,
   onClose,
   userName,
-  deepWorkTime,
-  date,
+  durationInMinutes,
 }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const templateRef = useRef<ViewShot>(null);
+
+  // Format time and date internally
+  const formattedTime = formatDurationForExport(
+    Math.floor(durationInMinutes * 60)
+  );
+  const formattedDate = format(new Date(), "EEE, MMM d");
 
   const handleExport = async () => {
     try {
@@ -57,7 +75,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal transparent animationType="fade" visible={true}>
       <View className="flex-1 bg-black/50 items-center justify-center">
         <View className="bg-white rounded-2xl p-6 w-[90%] max-w-xl">
           <View className="flex-row justify-between items-center mb-6">
@@ -76,8 +94,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <View className="w-full mb-6">
             <SharePreview
               userName={userName}
-              deepWorkTime={deepWorkTime}
-              date={date}
+              deepWorkTime={formattedTime}
+              date={formattedDate}
               isDarkMode={isDarkMode}
             />
           </View>
@@ -90,8 +108,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             >
               <ShareTemplate
                 userName={userName}
-                deepWorkTime={deepWorkTime}
-                date={date}
+                deepWorkTime={formattedTime}
+                date={formattedDate}
                 isDarkMode={isDarkMode}
               />
             </ViewShot>

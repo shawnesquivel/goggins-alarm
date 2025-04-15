@@ -59,7 +59,11 @@ export interface SessionServiceInterface {
 
   // Period operations
   createPeriod(periodData: DbPeriodInsert): Promise<DbPeriod>;
-  updatePeriod(periodId: string, periodData: DbPeriodUpdate): Promise<DbPeriod>;
+  updatePeriod(
+    periodId: string,
+    periodData: DbPeriodUpdate,
+    skipTotals: boolean
+  ): Promise<DbPeriod>;
   getPeriod(periodId: string): Promise<DbPeriod | null>;
   getSessionPeriods(sessionId: string): Promise<DbPeriod[]>;
   getLocalPeriods(): Promise<DbPeriod[]>;
@@ -87,4 +91,7 @@ export interface SessionServiceInterface {
     sessionId: string,
     periodType: string
   ): Promise<void>;
+
+  completeSessionLifecycle(sessionId: string): Promise<boolean>;
+  setupBackgroundSync(intervalMinutes?: number): Promise<void>;
 }

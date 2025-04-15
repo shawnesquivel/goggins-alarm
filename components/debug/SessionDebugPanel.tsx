@@ -9,6 +9,7 @@ import {
 } from "@/types/session";
 import { SessionService } from "@/services/SessionService";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { usePomodoro } from "@/contexts/AlarmContext";
 
 interface SessionDebugPanelProps {
   visible?: boolean;
@@ -23,6 +24,7 @@ export default function SessionDebugPanel({
     SessionPendingOperation[]
   >([]);
   const [expanded, setExpanded] = useState(false);
+  const { cancelSession } = usePomodoro();
 
   const loadSessionData = async () => {
     try {
@@ -49,6 +51,34 @@ export default function SessionDebugPanel({
     }
   };
 
+  const forceCompleteReset = async () => {
+    try {
+      console.log("Force Complete Reset");
+      // 1. Clear all UI state
+      setCurrentSession(null);
+      setCurrentPeriod(null);
+      setPendingOperations([]);
+      setExpanded(false);
+
+      // 2. Clear AsyncStorage session data
+      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_SESSION);
+      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_PERIOD);
+
+      // 3. Reset session service state
+      await SessionService.setCurrentPeriod(null);
+      await SessionService.setCurrentSession(null);
+
+      // 4. Force context reset
+      if (cancelSession) {
+        await cancelSession();
+      }
+
+      console.log("❗ forceCompleteReset: Finished");
+    } catch (error) {
+      console.error("Error during force reset:", error);
+    }
+  };
+
   useEffect(() => {
     if (visible) {
       loadSessionData();
@@ -57,7 +87,7 @@ export default function SessionDebugPanel({
     }
   }, [visible]);
 
-  if (!visible) return null;
+  if (!__DEV__ || !visible) return null;
 
   return (
     <View className="bg-white p-4 rounded-lg shadow">
@@ -65,15 +95,15 @@ export default function SessionDebugPanel({
         onPress={() => setExpanded(!expanded)}
         className="flex-row justify-between items-center"
       >
-        <Text className="text-lg font-bold">Session Debug Panel</Text>
-        <Text>{expanded ? "▼" : "▶"}</Text>
+        <Text className="text-sm font-bold">Session Debug Panel</Text>
+        <Text className="text-xs">{expanded ? "▼" : "▶"}</Text>
       </TouchableOpacity>
 
       {expanded && (
         <View className="mt-4">
           <View className="mb-4">
-            <Text className="font-bold">Current Session:</Text>
-            <Text>
+            <Text className="text-xs font-bold">Current Session:</Text>
+            <Text className="text-xs">
               {currentSession
                 ? JSON.stringify(currentSession, null, 2)
                 : "None"}
@@ -81,27 +111,38 @@ export default function SessionDebugPanel({
           </View>
 
           <View className="mb-4">
-            <Text className="font-bold">Current Period:</Text>
-            <Text>
+            <Text className="text-xs font-bold">Current Period:</Text>
+            <Text className="text-xs">
               {currentPeriod ? JSON.stringify(currentPeriod, null, 2) : "None"}
             </Text>
           </View>
 
           <View className="mb-4">
-            <Text className="font-bold">
+            <Text className="text-xs font-bold">
               Pending Operations ({pendingOperations.length}):
             </Text>
             <ScrollView className="max-h-40">
-              <Text>{JSON.stringify(pendingOperations, null, 2)}</Text>
+              <Text className="text-xs">
+                {JSON.stringify(pendingOperations, null, 2)}
+              </Text>
             </ScrollView>
           </View>
 
           <TouchableOpacity
             onPress={clearPendingSessions}
-            className="bg-red-500 p-2 rounded"
+            className="bg-red-500 p-2 rounded mb-2"
           >
-            <Text className="text-white text-center">
+            <Text className="text-xs text-white text-center">
               Clear Pending Sessions
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={forceCompleteReset}
+            className="bg-red-600 p-2 rounded"
+          >
+            <Text className="text-xs text-white text-center">
+              Reset State / Storage
             </Text>
           </TouchableOpacity>
         </View>

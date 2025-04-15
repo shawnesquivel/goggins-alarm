@@ -1,5 +1,5 @@
 // components/charts/ProjectPieChart.tsx
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { View, Text, Dimensions } from "react-native";
 import { PieChart } from "react-native-chart-kit";
 import {
@@ -7,6 +7,7 @@ import {
   LibreCaslonText_700Bold,
   useFonts,
 } from "@expo-google-fonts/libre-caslon-text";
+import { AnalyticsService } from "@/services/AnalyticsService";
 
 // Add this helper function to format total time
 const formatTotalTime = (totalMinutes: number) => {
@@ -25,80 +26,62 @@ export const ProjectPieChart = () => {
     "LibreCaslonText-Bold": LibreCaslonText_700Bold,
   });
 
-  const data = [
+  const [projectData, setProjectData] = useState<
     {
-      name: "Deep Work Timer",
-      population: 480, // 8 hours
-      color: "#FF6B6B", // Soft coral red
-      legendFontColor: "#333",
-    },
-    {
-      name: "Blog Writing",
-      population: 180, // 3 hours
-      color: "#4ECDC4", // Mint
-      legendFontColor: "#333",
-    },
-    {
-      name: "Open Source",
-      population: 120, // 2 hours
-      color: "#45B7D1", // Ocean blue
-      legendFontColor: "#333",
-    },
-    {
-      name: "Learning",
-      population: 60, // 1 hour
-      color: "#96CEB4", // Sage green
-      legendFontColor: "#333",
-    },
-    {
-      name: "Quick Task",
-      population: 15, // 15 mins
-      color: "#EEE8A9", // Soft yellow
-      legendFontColor: "#333",
-    },
-    {
-      name: "Client Meeting",
-      population: 90, // 1.5 hours
-      color: "#9D94B3", // Muted purple
-      legendFontColor: "#333",
-    },
-    {
-      name: "Code Review",
-      population: 45, // 45 mins
-      color: "#F7D794", // Peach
-      legendFontColor: "#333",
-    },
-    {
-      name: "Documentation",
-      population: 150, // 2.5 hours
-      color: "#786FA6", // Dusty purple
-      legendFontColor: "#333",
-    },
-    {
-      name: "Research",
-      population: 240, // 4 hours
-      color: "#88B04B", // Greenery
-      legendFontColor: "#333",
-    },
-    {
-      name: "Planning",
-      population: 30, // 30 mins
-      color: "#FFAAA5", // Soft pink
-      legendFontColor: "#333",
-    },
-  ];
+      name: string;
+      population: number;
+      color: string;
+      legendFontColor: string;
+    }[]
+  >([]);
 
+  const [restStats, setRestStats] = useState<{
+    totalSessions: number;
+    totalMinutes: number;
+  }>({ totalSessions: 0, totalMinutes: 0 });
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const [projectStats, restData] = await Promise.all([
+        AnalyticsService.getProjectTimeStats(),
+        AnalyticsService.getRestStats(),
+      ]);
+
+      // Transform stats into the format PieChart expects
+      const formattedData = projectStats.map((project) => ({
+        name: project.name,
+        population: Math.round(project.totalMinutes), // Round to avoid floating point issues
+        color: project.color || "#73AEA4", // Use project color or fallback
+        legendFontColor: "#333",
+      }));
+
+      console.log("Formatted pie chart data:", formattedData);
+      console.log("Rest stats:", restData);
+
+      setProjectData(formattedData);
+      setRestStats(restData);
+    };
+
+    fetchData();
+  }, []);
+
+  // Center the chart
   const chartConfig = {
     backgroundGradientFrom: "#fff",
     backgroundGradientTo: "#fff",
     color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
     labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+    strokeWidth: 2,
+    barPercentage: 0.5,
+    useShadowColorFromDataset: false,
   };
 
   const renderLegend = () => {
-    const midpoint = Math.ceil(data.length / 2);
-    const leftColumn = data.slice(0, midpoint);
-    const rightColumn = data.slice(midpoint);
+    if (!projectData.length) return null;
+
+    const midpoint = Math.ceil(projectData.length / 2);
+    const leftColumn = projectData.slice(0, midpoint);
+    const rightColumn = projectData.slice(midpoint);
 
     return (
       <View className="flex-row mt-4 px-4 mb-8">
@@ -158,12 +141,23 @@ export const ProjectPieChart = () => {
   };
 
   // Calculate total time from data
-  const totalMinutes = data.reduce((acc, item) => acc + item.population, 0);
+  const totalMinutes = projectData.reduce(
+    (acc, item) => acc + item.population,
+    0
+  );
 
   if (!fontsLoaded) {
     return (
       <View className="items-center justify-center bg-[#FAF9F6] rounded-lg p-4">
         <Text>Loading fonts...</Text>
+      </View>
+    );
+  }
+
+  if (projectData.length === 0) {
+    return (
+      <View className="items-center justify-center bg-[#FAF9F6] rounded-lg p-4">
+        <Text>No project data available</Text>
       </View>
     );
   }
@@ -182,7 +176,7 @@ export const ProjectPieChart = () => {
         {/* Center the chart */}
         <View className="items-center justify-center">
           <PieChart
-            data={data}
+            data={projectData}
             width={Dimensions.get("window").width - 32}
             height={220}
             chartConfig={chartConfig}
@@ -222,7 +216,7 @@ export const ProjectPieChart = () => {
               className="text-4xl text-black mb-1"
               style={{ fontFamily: "LibreCaslonText" }}
             >
-              3
+              {projectData.length}
             </Text>
             <Text
               className="text-sm text-[#333] text-center mb-4 uppercase"
@@ -234,7 +228,7 @@ export const ProjectPieChart = () => {
               className="text-3xl text-black mb-1"
               style={{ fontFamily: "LibreCaslonText" }}
             >
-              56:00
+              {formatTotalTime(totalMinutes)}
             </Text>
             <Text
               className="text-sm text-[#333] text-center uppercase"
@@ -248,7 +242,7 @@ export const ProjectPieChart = () => {
               className="text-4xl text-black mb-1"
               style={{ fontFamily: "LibreCaslonText" }}
             >
-              1
+              {restStats.totalSessions}
             </Text>
             <Text
               className="text-sm text-[#333] text-center mb-4 uppercase"
@@ -260,7 +254,7 @@ export const ProjectPieChart = () => {
               className="text-3xl text-black mb-1"
               style={{ fontFamily: "LibreCaslonText" }}
             >
-              10:00
+              {formatTotalTime(restStats.totalMinutes)}
             </Text>
             <Text
               className="text-sm text-[#333] text-center uppercase"
