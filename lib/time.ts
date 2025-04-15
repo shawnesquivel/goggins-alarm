@@ -1,3 +1,5 @@
+import { format } from "date-fns";
+
 export const formatTimeSummary = (minutes: number): string => {
   if (minutes < 60) {
     return `${Math.floor(minutes)}:00`;
@@ -35,4 +37,10 @@ export const formatDurationForExport = (seconds: number): string => {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   return `${hours}h ${minutes}m`;
+};
+
+// Format time only for the session list items
+export const formatTime = (dateString: string) => {
+  const date = new Date(dateString);
+  return format(date, "h:mm a").toLowerCase();
 };

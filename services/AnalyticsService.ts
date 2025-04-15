@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { SessionService } from "./SessionService";
 import { format } from "date-fns";
+import { Session } from "@/types/session";
 
 export const AnalyticsService = {
   async getUserDailyGoal(): Promise<number> {
@@ -245,6 +246,50 @@ export const AnalyticsService = {
       return Object.values(aggregatedStats);
     } catch (error) {
       console.error("Error fetching project stats:", error);
+      return [];
+    }
+  },
+
+  async getRecentSessions(limit: number = 20): Promise<Session[]> {
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (!authData?.user) return [];
+
+      // Fetch recent sessions with projects information
+      const { data, error } = await supabase
+        .from("sessions")
+        .select(
+          `
+          id, 
+          task, 
+          total_deep_work_minutes, 
+          created_at, 
+          status,
+          project_id,
+          projects(name, color)
+        `
+        )
+        .eq("user_id", authData.user.id)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (error) {
+        console.error("Error fetching recent sessions:", error);
+        return [];
+      }
+
+      // Transform data to match Session type
+      return (data || []).map((session) => ({
+        id: session.id,
+        task: session.task,
+        total_deep_work_minutes: session.total_deep_work_minutes,
+        created_at: session.created_at,
+        status: session.status,
+        project_id: session.project_id,
+        project: session.projects || undefined,
+      }));
+    } catch (error) {
+      console.error("Error in getRecentSessions:", error);
       return [];
     }
   },
