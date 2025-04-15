@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { SessionService } from "./SessionService";
-import { format } from "date-fns";
 import { Session } from "@/types/session";
+import { startOfWeek, endOfWeek } from "date-fns";
 
 export const AnalyticsService = {
   async getUserDailyGoal(): Promise<number> {
@@ -105,20 +105,25 @@ export const AnalyticsService = {
     };
   },
 
-  async getRestStats(timeframe: "day" | "week" | "month" = "week"): Promise<{
+  async getRestStats(
+    timeframe: "day" | "week" | "month" = "week",
+    selectedDate?: Date
+  ): Promise<{
     totalSessions: number;
     totalMinutes: number;
   }> {
-    // Get date range based on timeframe
-    const now = new Date();
-    let startDate = new Date();
+    // Get date range based on timeframe and selectedDate
+    let now = selectedDate || new Date();
+    let startDate = new Date(now);
 
     switch (timeframe) {
       case "day":
         startDate.setDate(now.getDate() - 1);
         break;
       case "week":
-        startDate.setDate(now.getDate() - 7);
+        // Always use Sunday to Saturday
+        startDate = startOfWeek(now);
+        now = endOfWeek(now);
         break;
       case "month":
         startDate.setMonth(now.getMonth() - 1);
@@ -163,7 +168,8 @@ export const AnalyticsService = {
   },
 
   async getProjectTimeStats(
-    timeframe: "day" | "week" | "month" = "week"
+    timeframe: "day" | "week" | "month" = "week",
+    selectedDate?: Date
   ): Promise<
     {
       projectId: string;
@@ -172,16 +178,18 @@ export const AnalyticsService = {
       totalMinutes: number;
     }[]
   > {
-    // Get date range based on timeframe
-    const now = new Date();
-    let startDate = new Date();
+    // Get date range based on timeframe and selectedDate
+    let now = selectedDate || new Date();
+    let startDate = new Date(now);
 
     switch (timeframe) {
       case "day":
         startDate.setDate(now.getDate() - 1);
         break;
       case "week":
-        startDate.setDate(now.getDate() - 7);
+        // Always use Sunday to Saturday
+        startDate = startOfWeek(now);
+        now = endOfWeek(now);
         break;
       case "month":
         startDate.setMonth(now.getMonth() - 1);

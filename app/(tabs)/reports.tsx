@@ -130,7 +130,7 @@ export default function ReportsScreen() {
       </View>
 
       <View className="p-4">
-        <ProjectPieChart />
+        <ProjectPieChart selectedWeek={selectedWeek} />
       </View>
 
       <WeekPicker
@@ -139,6 +139,7 @@ export default function ReportsScreen() {
         selectedDate={selectedWeek}
         onSelectWeek={(date: Date) => {
           setSelectedWeek(date);
+          setWeekPickerVisible(false);
           loadData();
         }}
       />
