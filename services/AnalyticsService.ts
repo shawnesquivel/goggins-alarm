@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { SessionService } from "./SessionService";
 import { format } from "date-fns";
+
 export const AnalyticsService = {
   async getUserDailyGoal(): Promise<number> {
     try {
@@ -217,15 +218,10 @@ export const AnalyticsService = {
           if (!session.project_id || !session.projects) return acc;
 
           if (!acc[session.project_id]) {
-            // Handle both array and object formats + add fallbacks
-            const projectData = Array.isArray(session.projects)
-              ? session.projects[0]
-              : session.projects;
-
             acc[session.project_id] = {
               projectId: session.project_id,
-              name: projectData?.name || "Unnamed Project",
-              color: projectData?.color || "#CCCCCC",
+              name: session.projects[0].name,
+              color: session.projects[0].color,
               totalMinutes: 0,
             };
           }
