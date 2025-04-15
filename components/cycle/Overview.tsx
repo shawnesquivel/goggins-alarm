@@ -32,7 +32,7 @@ const Overview = () => {
             deepWorkMinutes={analytics.deepWorkMinutes}
             isLoading={isAnalyticsLoading}
           />
-          <Text className="text-sm text-gray-600 mb-1">TOTAL DEEP WORK</Text>
+          <Text className="text-sm text-gray-600 mt-4">TOTAL DEEP WORK</Text>
           <Text className="text-2xl">
             {isAnalyticsLoading ? "..." : analytics.totalDeepWork}
           </Text>
