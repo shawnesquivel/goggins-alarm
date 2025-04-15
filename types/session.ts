@@ -95,3 +95,21 @@ export interface SessionServiceInterface {
   completeSessionLifecycle(sessionId: string): Promise<boolean>;
   setupBackgroundSync(intervalMinutes?: number): Promise<void>;
 }
+
+export interface SessionSection {
+  title: string;
+  data: Session[];
+}
+
+export interface Session {
+  id: string;
+  task: string;
+  total_deep_work_minutes: number;
+  created_at: string;
+  status: string;
+  project_id: string | null;
+  project?: {
+    name: string;
+    color: string;
+  };
+}

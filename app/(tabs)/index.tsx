@@ -13,7 +13,6 @@ import SessionDebugPanel from "@/components/debug/SessionDebugPanel";
 import { ExportModal } from "@/components/shared/modals/ExportModal";
 import { HeaderRight } from "@/components/shared/HeaderRight";
 import { SessionService } from "@/services/SessionService";
-import Overview from "@/components/cycle/Overview";
 import AuthDebugPanel from "@/components/debug/AuthDebugPanel";
 import EndEarlyModal from "@/components/cancel/EndEarlyModal";
 import { CancelFlowStep } from "@/constants/CancelFlowStep";
@@ -24,6 +23,7 @@ import EndCycleEarlyBtn from "@/components/cycle/EndCycleEarlyBtn";
 import { RestActivityRatingModal } from "@/components/shared/modals/RestActivityRatingModal";
 import FocusRatingModal from "@/components/shared/modals/FocusRatingModal";
 import OvertimeInfo from "@/components/cycle/OvertimeInfo";
+import HomeScreen from "@/components/cycle/HomeScreen";
 
 export default function TimerScreen() {
   const navigation = useNavigation();
@@ -597,7 +597,7 @@ export default function TimerScreen() {
       className="flex-1 bg-white"
       contentContainerStyle={{ padding: 20 }}
     >
-      <Overview />
+      <HomeScreen />
 
       {/* Home Page Timer Display */}
       <View className="items-center py-8">
