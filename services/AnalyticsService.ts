@@ -198,12 +198,9 @@ export const AnalyticsService = {
         .from("sessions")
         .select(
           `
+          id,
           project_id,
-          total_deep_work_minutes,
-          projects (
-            name,
-            color
-          )
+          total_deep_work_minutes
         `
         )
         .eq("user_id", authData.user.id)
@@ -211,18 +208,45 @@ export const AnalyticsService = {
         .gte("created_at", startDate.toISOString())
         .lte("created_at", now.toISOString());
 
-      if (!projectStats) return [];
+      if (!projectStats || projectStats.length === 0) return [];
+
+      // Get all referenced projects
+      const projectIds = projectStats
+        .filter((session) => session.project_id)
+        .map((session) => session.project_id);
+
+      // If no project IDs, return empty array
+      if (projectIds.length === 0) return [];
+
+      // Fetch project data in a separate query
+      const { data: projectData } = await supabase
+        .from("projects")
+        .select("id, name, color")
+        .in("id", projectIds);
+
+      // Create a lookup map for projects
+      const projectsMap = (projectData || []).reduce<
+        Record<string, { name: string; color: string }>
+      >((acc, project) => {
+        acc[project.id] = {
+          name: project.name,
+          color: project.color || "#808080",
+        };
+        return acc;
+      }, {});
 
       // Aggregate by project
       const aggregatedStats = projectStats.reduce(
         (acc, session) => {
-          if (!session.project_id || !session.projects) return acc;
+          if (!session.project_id) return acc;
+
+          const projectInfo = projectsMap[session.project_id];
 
           if (!acc[session.project_id]) {
             acc[session.project_id] = {
               projectId: session.project_id,
-              name: session.projects[0].name,
-              color: session.projects[0].color,
+              name: projectInfo ? projectInfo.name : "Unknown Project",
+              color: projectInfo ? projectInfo.color : "#808080",
               totalMinutes: 0,
             };
           }
@@ -286,7 +310,15 @@ export const AnalyticsService = {
         created_at: session.created_at,
         status: session.status,
         project_id: session.project_id,
-        project: session.projects || undefined,
+        project:
+          session.projects &&
+          Array.isArray(session.projects) &&
+          session.projects.length > 0
+            ? {
+                name: session.projects[0].name,
+                color: session.projects[0].color || "#808080",
+              }
+            : undefined,
       }));
     } catch (error) {
       console.error("Error in getRecentSessions:", error);
