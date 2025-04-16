@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { Project } from "@/types/project";
 import { PendingOperation, ProjectService } from "@/services/ProjectService";
 import { checkConnection } from "@/lib/supabase";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface ProjectContextType {
   projects: Project[];
@@ -17,6 +18,7 @@ interface ProjectContextType {
   deleteProject: (id: string) => Promise<boolean>;
   syncProjects: () => Promise<void>;
   clearPendingOperations: () => Promise<PendingOperation[]>;
+  resetAllProjects: () => Promise<void>;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -129,6 +131,23 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resetAllProjects = async () => {
+    console.log("ProjectContext - Resetting all projects");
+    try {
+      setLoading(true);
+      // Clear local storage directly
+      await AsyncStorage.setItem("offline_projects", JSON.stringify([]));
+      // Clear context state
+      setProjects([]);
+      console.log("ProjectContext - All projects reset");
+    } catch (err) {
+      setError("Failed to reset projects");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Initialize projects
   useEffect(() => {
     loadProjects();
@@ -173,6 +192,7 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
         pendingOps,
         errorCount,
         clearPendingOperations,
+        resetAllProjects,
       }}
     >
       {children}
