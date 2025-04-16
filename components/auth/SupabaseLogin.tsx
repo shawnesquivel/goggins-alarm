@@ -29,10 +29,11 @@ export default function Auth({ isOnboardingFlow = false }) {
     console.log("App URL scheme:", Constants.expoConfig?.scheme);
 
     // Determine redirect URL based on platform
-    const redirectUrl = Platform.select({
-      web: `${window.location.origin}/login-callback`,
-      default: Linking.createURL("login-callback"),
-    });
+    const redirectUrl =
+      Platform.OS === "web" && typeof window !== "undefined"
+        ? `${window.location.origin}/login-callback`
+        : Linking.createURL("login-callback");
+
     console.log("Redirect URL:", redirectUrl);
 
     // Check if we can reach Supabase
@@ -148,10 +149,10 @@ export default function Auth({ isOnboardingFlow = false }) {
 
   const signInWithGoogle = async () => {
     try {
-      const redirectUrl = Platform.select({
-        web: `${window.location.origin}/login-callback`,
-        default: Linking.createURL("login-callback"),
-      });
+      const redirectUrl =
+        Platform.OS === "web" && typeof window !== "undefined"
+          ? `${window.location.origin}/login-callback`
+          : Linking.createURL("login-callback");
 
       console.log("Starting Google sign-in with redirect URL:", redirectUrl);
       console.log("Supabase URL:", Constants.expoConfig?.extra?.supabaseUrl);
@@ -168,7 +169,7 @@ export default function Auth({ isOnboardingFlow = false }) {
       if (error) throw error;
       if (!data?.url) throw new Error("No auth URL received");
 
-      if (Platform.OS === "web") {
+      if (Platform.OS === "web" && typeof window !== "undefined") {
         window.location.href = data.url;
       } else {
         const result = await WebBrowser.openAuthSessionAsync(
