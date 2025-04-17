@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS public.sessions (
   cancelled_reason TEXT, -- Only if cancelled
   completed BOOLEAN DEFAULT false, -- Ref: 1.6.7.3 - Track completion status
   user_notes TEXT, -- Ref: 1.6.8.2 - Optional notes for the entire session
-  distraction_reasons_selected TEXT[], -- Ref: 1.6.1.3.1.2 - Single reasons for ending early
+  distraction_reasons_selected TEXT[] -- Ref: 1.6.1.3.1.2 - Single reasons for ending early
 );
 
 -- Unified periods table for both work and rest
