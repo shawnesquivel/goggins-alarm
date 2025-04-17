@@ -64,7 +64,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     debounceTimer.current = setTimeout(() => {
       // Skip events if app is not visible
       if (!isVisible.current) {
-        console.log(`[Auth] Skipping event ${event} - app not visible`);
         return;
       }
 
@@ -81,22 +80,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Skip INITIAL_SESSION after initialization
       if (event === "INITIAL_SESSION" && isInitialized) {
-        console.log("[Auth] Skipping INITIAL_SESSION after initialization");
         return;
       }
 
       // For the first SIGNED_IN event, treat it as the initial session
       if (event === "SIGNED_IN" && !isInitialized) {
-        console.log(
-          `[Auth] Auth state change event: ${event} (Initial session)`
-        );
         setSession(newSession);
         logRefreshTiming("INITIAL_SESSION");
         setIsInitialized(true);
         return;
       }
 
-      console.log(`[Auth] Auth state change event: ${event}`);
       setSession(newSession);
       logRefreshTiming(event);
     }, 100); // 100ms debounce
@@ -108,9 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const handleVisibilityChange = () => {
         isVisible.current = !document.hidden;
         if (isVisible.current) {
-          console.log("[Auth] App became visible");
         } else {
-          console.log("[Auth] App became hidden");
           // Clear any pending auth changes
           if (debounceTimer.current) {
             clearTimeout(debounceTimer.current);
