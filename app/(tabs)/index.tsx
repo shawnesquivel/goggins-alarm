@@ -512,12 +512,10 @@ export default function TimerScreen() {
         ended_at: new Date().toISOString(),
         quality_rating: options.rating || null,
         rest_activities_selected: options.activity ? [options.activity] : null,
+        // Explicitly set to null for rest periods
+        work_time_completed:
+          currentPeriod.type === "work" ? options.isTaskComplete : null,
       };
-
-      // Only set work_time_completed for work periods
-      if (currentPeriod.type === "work") {
-        periodUpdateData.work_time_completed = options.isTaskComplete;
-      }
 
       await SessionService.updatePeriod(
         currentPeriod.id,
