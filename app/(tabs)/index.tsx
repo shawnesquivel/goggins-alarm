@@ -24,6 +24,7 @@ import { RestActivityRatingModal } from "@/components/shared/modals/RestActivity
 import FocusRatingModal from "@/components/shared/modals/FocusRatingModal";
 import OvertimeInfo from "@/components/cycle/OvertimeInfo";
 import HomeScreen from "@/components/cycle/HomeScreen";
+import { DbPeriodUpdate } from "@/types/session";
 
 export default function TimerScreen() {
   const navigation = useNavigation();
@@ -127,7 +128,9 @@ export default function TimerScreen() {
 
       // Check if session is already completed or cancelled
       if (!currentPeriod || !dbSession) {
-        console.warn("Session or period not found, already cleaned up");
+        console.warn(
+          "[handleSubmitWorkPeriodReflectionWithRating] Session or period not found, already cleaned up"
+        );
         setShowRatingModal(false);
         return;
       }
@@ -190,7 +193,9 @@ export default function TimerScreen() {
 
       // Check if session is already completed or cancelled
       if (!currentPeriod || !dbSession) {
-        console.warn("Session or period not found, already cleaned up");
+        console.warn(
+          "[submitRestPeriodWithActivity] Session or period not found, already cleaned up"
+        );
         setShowBreakRatingModal(false);
         return;
       }
@@ -252,15 +257,20 @@ export default function TimerScreen() {
 
       if (currentPeriod && dbSession) {
         // Calculate actual duration
-        const startTime = new Date(currentSession.startTime);
-        const endTime = new Date();
+        const periodStartTime = currentPeriod.started_at
+          ? new Date(currentPeriod.started_at)
+          : new Date();
+        const periodEndTime = new Date();
         const actualSeconds = Math.floor(
-          (endTime.getTime() - startTime.getTime()) / 1000
+          (periodEndTime.getTime() - periodStartTime.getTime()) / 1000
         );
 
         // Keep as array with single element to match DB schema
         const activityArray = [activity];
 
+        // Only update the period, don't call completeRestPeriod
+        // Note: We don't sync to Supabase here to reduce network calls.
+        // All period updates will be synced during completeSessionWithReflection.
         await SessionService.updatePeriod(
           currentPeriod.id,
           {
@@ -271,8 +281,7 @@ export default function TimerScreen() {
           true
         );
 
-        // For the cancel flow, we DO NOT call completeRestPeriod with startNewWork=true
-        await completeRestPeriod(activityArray, false);
+        // Skip completeRestPeriod call that would clear the period
       }
     } catch (error) {
       console.error("Error updating rest period for cancel flow:", error);
@@ -438,6 +447,8 @@ export default function TimerScreen() {
         );
 
         // Update period with duration and rating
+        // Note: We don't sync to Supabase here to reduce network calls.
+        // All period updates will be synced during completeSessionWithReflection.
         console.log("Updating period from handleCancelFlowFocusRating");
         await SessionService.updatePeriod(
           currentPeriod.id,
@@ -475,7 +486,9 @@ export default function TimerScreen() {
 
       // Early return conditions - just log and let finally block handle cleanup
       if (!currentPeriod || !dbSession) {
-        console.warn("Session or period not found, already cleaned up");
+        console.warn(
+          "[completeSessionWithReflection] Session or period not found, already cleaned up"
+        );
         return;
       }
 
@@ -494,17 +507,21 @@ export default function TimerScreen() {
         (endTime.getTime() - startTime.getTime()) / 1000
       );
 
+      const periodUpdateData: DbPeriodUpdate = {
+        actual_duration_minutes: actualSeconds / 60,
+        ended_at: new Date().toISOString(),
+        quality_rating: options.rating || null,
+        rest_activities_selected: options.activity ? [options.activity] : null,
+      };
+
+      // Only set work_time_completed for work periods
+      if (currentPeriod.type === "work") {
+        periodUpdateData.work_time_completed = options.isTaskComplete;
+      }
+
       await SessionService.updatePeriod(
         currentPeriod.id,
-        {
-          actual_duration_minutes: actualSeconds / 60,
-          ended_at: new Date().toISOString(),
-          quality_rating: options.rating || null,
-          rest_activities_selected: options.activity
-            ? [options.activity]
-            : null,
-          work_time_completed: options.isTaskComplete,
-        },
+        periodUpdateData,
         true
       );
 
@@ -513,18 +530,20 @@ export default function TimerScreen() {
         options.sessionId
       );
 
+      console.log("notes: ", options.notes);
+
       // Update session with reflection data and totals
       await SessionService.updateSession(options.sessionId, {
         status: options.isTaskComplete ? "completed" : "cancelled",
         completed: options.isTaskComplete,
-        distraction_reasons_selected:
-          options.reasons.length > 0 ? options.reasons : null,
+        distraction_reasons_selected: options.reasons,
         user_notes: options.notes || null,
         total_deep_work_minutes: totals.total_deep_work_minutes,
         total_deep_rest_minutes: totals.total_deep_rest_minutes,
       });
 
-      // Force sync to Supabase
+      // This is where we sync all pending operations to Supabase,
+      // including any period updates from earlier in the flow.
       await SessionService.syncToSupabase();
 
       // Call the context's cancelSession to clean up UI state
