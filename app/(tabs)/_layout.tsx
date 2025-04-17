@@ -57,22 +57,6 @@ export default function TabLayout() {
           tabBarShowLabel: true,
         }}
       />
-      <Tabs.Screen
-        name="project-test"
-        options={{
-          title: "Project Test",
-          tabBarIcon: ({ color }) => <TabBarIcon name="flask" color={color} />,
-          tabBarShowLabel: true,
-        }}
-      />
-      <Tabs.Screen
-        name="auth-test"
-        options={{
-          title: "Auth Test",
-          tabBarIcon: ({ color }) => <TabBarIcon name="user" color={color} />,
-          tabBarShowLabel: true,
-        }}
-      />
     </Tabs>
   );
 }
