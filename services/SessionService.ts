@@ -143,7 +143,6 @@ export const SessionService: SessionServiceInterface = {
       ended_at: null,
       quality_rating: null,
       rest_activities_selected: null,
-      user_notes: null,
     } as DbPeriod;
 
     // Save locally
@@ -407,7 +406,11 @@ export const SessionService: SessionServiceInterface = {
             const { error } = await supabase.from("periods").insert(periodData);
 
             if (error) {
-              console.error("Error inserting period:", error);
+              console.error(
+                "Error inserting period:",
+                { periodData },
+                { error }
+              );
               continue;
             }
           } else if (op.type === "update_period") {
