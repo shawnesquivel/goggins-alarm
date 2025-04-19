@@ -1,4 +1,3 @@
-// services/SessionService.ts
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { v4 as uuidv4 } from "uuid";
 import { supabase } from "@/lib/supabase";
@@ -15,7 +14,10 @@ import {
 } from "@/types/session";
 
 export const SessionService: SessionServiceInterface = {
-  // Session operations
+  /**
+   * Creates a new session in local storage and queues it for syncing to Supabase.
+   * Offline-first: Saves to local storage immediately and queues for later sync.
+   */
   async createSession(sessionData: DbSessionInsert): Promise<DbSession> {
     // Generate ID if not provided
     const session: DbSession = {
@@ -26,7 +28,7 @@ export const SessionService: SessionServiceInterface = {
       status: sessionData.status || "in_progress",
       total_deep_work_minutes: 0,
       total_deep_rest_minutes: 0,
-      completed: false,
+      task_completed: false,
     } as DbSession;
 
     // Save locally first
@@ -50,6 +52,10 @@ export const SessionService: SessionServiceInterface = {
     return session;
   },
 
+  /**
+   * Updates an existing session in local storage and queues changes for syncing to Supabase.
+   * Offline-first: Updates local storage immediately and queues for later sync.
+   */
   async updateSession(
     sessionId: string,
     sessionData: DbSessionUpdate
@@ -100,12 +106,20 @@ export const SessionService: SessionServiceInterface = {
     return updatedSession;
   },
 
+  /**
+   * Retrieves a single session from local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async getSession(sessionId: string): Promise<DbSession | null> {
     const sessions = await this.getSessions();
     const session = sessions.find((s) => s.id === sessionId);
     return session || null;
   },
 
+  /**
+   * Retrieves all sessions from local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async getSessions(): Promise<DbSession[]> {
     try {
       const storedSessions = await AsyncStorage.getItem(
@@ -119,11 +133,11 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
-  // Period operations
+  /**
+   * Creates a new period in local storage and queues it for syncing to Supabase.
+   * Offline-first: Saves to local storage immediately and queues for later sync.
+   */
   async createPeriod(periodData: DbPeriodInsert): Promise<DbPeriod> {
-    console.log("SessionService: Creating period", periodData);
-
-    // First, clean up any existing in-progress periods for this session
     if (periodData.session_id) {
       await this.cleanupInProgressPeriods(
         periodData.session_id,
@@ -143,7 +157,6 @@ export const SessionService: SessionServiceInterface = {
       ended_at: null,
       quality_rating: null,
       rest_activities_selected: null,
-      user_notes: null,
     } as DbPeriod;
 
     // Save locally
@@ -167,6 +180,10 @@ export const SessionService: SessionServiceInterface = {
     return period;
   },
 
+  /**
+   * Updates an existing period in local storage and queues changes for syncing to Supabase.
+   * Offline-first: Updates local storage immediately and queues for later sync.
+   */
   async updatePeriod(
     periodId: string,
     periodData: DbPeriodUpdate,
@@ -238,6 +255,10 @@ export const SessionService: SessionServiceInterface = {
     return updatedPeriod;
   },
 
+  /**
+   * Retrieves a single period from local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async getPeriod(periodId: string): Promise<DbPeriod | null> {
     const periods = await this.getLocalPeriods();
     const period = periods.find((p) => p.id === periodId);
@@ -245,6 +266,10 @@ export const SessionService: SessionServiceInterface = {
     return period || null;
   },
 
+  /**
+   * Retrieves all periods for a specific session from local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async getSessionPeriods(sessionId: string): Promise<DbPeriod[]> {
     const periods = await this.getLocalPeriods();
     const sessionPeriods = periods.filter((p) => p.session_id === sessionId);
@@ -252,6 +277,10 @@ export const SessionService: SessionServiceInterface = {
     return sessionPeriods;
   },
 
+  /**
+   * Retrieves all periods from local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async getLocalPeriods(): Promise<DbPeriod[]> {
     try {
       const storedPeriods = await AsyncStorage.getItem(
@@ -264,7 +293,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
-  // Helper function to clean up in-progress periods
+  /**
+   * Cleans up any in-progress periods by marking them as complete.
+   * Offline-first: Updates local storage and queues changes for sync.
+   */
   async cleanupInProgressPeriods(
     sessionId: string,
     periodType: string
@@ -288,7 +320,6 @@ export const SessionService: SessionServiceInterface = {
           type: "update_period",
           data: {
             id: period.id,
-            completed: true,
             ended_at: period.ended_at,
             actual_duration_minutes: period.actual_duration_minutes,
             last_updated_at: period.last_updated_at,
@@ -308,7 +339,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
-  // Current session/period management
+  /**
+   * Gets the current active session from local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async getCurrentSession(): Promise<DbSession | null> {
     try {
       const currentSession = await AsyncStorage.getItem(
@@ -321,6 +355,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
+  /**
+   * Gets the current active period from local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async getCurrentPeriod(): Promise<DbPeriod | null> {
     try {
       const currentPeriod = await AsyncStorage.getItem(
@@ -333,6 +371,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
+  /**
+   * Sets the current active session in local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async setCurrentSession(session: DbSession | null): Promise<void> {
     if (session) {
       await AsyncStorage.setItem(
@@ -344,6 +386,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
+  /**
+   * Sets the current active period in local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async setCurrentPeriod(period: DbPeriod | null): Promise<void> {
     if (period) {
       await AsyncStorage.setItem(
@@ -355,7 +401,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
-  // Sync operations
+  /**
+   * Syncs all pending operations to Supabase.
+   * Database operation: Directly interacts with Supabase to sync local changes.
+   */
   async syncToSupabase(force: boolean = false): Promise<boolean> {
     try {
       const pendingOps = await this.getPendingOperations();
@@ -407,7 +456,11 @@ export const SessionService: SessionServiceInterface = {
             const { error } = await supabase.from("periods").insert(periodData);
 
             if (error) {
-              console.error("Error inserting period:", error);
+              console.error(
+                "Error inserting period:",
+                { periodData },
+                { error }
+              );
               continue;
             }
           } else if (op.type === "update_period") {
@@ -445,6 +498,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
+  /**
+   * Gets all pending operations from local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async getPendingOperations(): Promise<SessionPendingOperation[]> {
     try {
       const pendingOps = await AsyncStorage.getItem(
@@ -460,6 +517,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
+  /**
+   * Adds a new operation to the pending operations queue in local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async addPendingOperation(
     operation: Omit<SessionPendingOperation, "id">
   ): Promise<void> {
@@ -478,6 +539,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
+  /**
+   * Removes a completed operation from the pending operations queue in local storage.
+   * Local-only: Does not interact with Supabase.
+   */
   async removePendingOperation(operationId: string): Promise<void> {
     try {
       const pendingOps = await this.getPendingOperations();
@@ -491,7 +556,10 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
-  // Helper methods
+  /**
+   * Calculates and updates total work/rest minutes for a session.
+   * Offline-first: Updates local storage and queues changes for sync.
+   */
   async calculateSessionTotals(sessionId: string): Promise<{
     total_deep_work_minutes: number;
     total_deep_rest_minutes: number;
@@ -529,6 +597,10 @@ export const SessionService: SessionServiceInterface = {
     };
   },
 
+  /**
+   * Completes a session lifecycle by syncing to Supabase and clearing local state.
+   * Database operation: Attempts to sync with Supabase before clearing local state.
+   */
   async completeSessionLifecycle(sessionId: string): Promise<boolean> {
     try {
       // First try to sync data to Supabase
@@ -538,8 +610,6 @@ export const SessionService: SessionServiceInterface = {
         console.warn(
           "Sync to Supabase failed during session completion, operations queued for later sync"
         );
-        // Make sure completion operation is recorded
-        // (All updates should already be in pending queue from earlier operations)
       }
 
       // Clear session state regardless of sync result
@@ -548,9 +618,6 @@ export const SessionService: SessionServiceInterface = {
       await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_SESSION);
       await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_PERIOD);
 
-      // Note: We're specifically NOT clearing pending operations
-      // They'll be synced later when connectivity is restored
-
       return syncSuccessful;
     } catch (error) {
       console.error("Error in completeSessionLifecycle:", error);
@@ -558,8 +625,11 @@ export const SessionService: SessionServiceInterface = {
     }
   },
 
+  /**
+   * Sets up periodic background syncing to Supabase.
+   * Database operation: Periodically attempts to sync pending operations to Supabase.
+   */
   async setupBackgroundSync(intervalMinutes: number = 5): Promise<void> {
-    // This could be called from your App.tsx or similar initialization point
     setInterval(async () => {
       try {
         const pendingOps = await this.getPendingOperations();
@@ -573,5 +643,30 @@ export const SessionService: SessionServiceInterface = {
         console.error("Background sync error:", error);
       }
     }, intervalMinutes * 60 * 1000);
+  },
+
+  /**
+   * Completes a session with the correct completion status.
+   * This handles both successfully completed sessions and cancelled sessions.
+   * @param sessionId The ID of the session to complete
+   * @param taskCompleted Whether the user successfully completed their task/goal (true) or ended early (false)
+   */
+  async completeSession(
+    sessionId: string,
+    taskCompleted: boolean
+  ): Promise<boolean> {
+    try {
+      // First update the session with the correct status and task_completed flag
+      await this.updateSession(sessionId, {
+        status: taskCompleted ? "completed" : "cancelled",
+        task_completed: taskCompleted, // Renamed from completed to task_completed
+      });
+
+      // Then proceed with the lifecycle cleanup (sync and state clearing)
+      return await this.completeSessionLifecycle(sessionId);
+    } catch (error) {
+      console.error("Error in completeSession:", error);
+      return false;
+    }
   },
 };

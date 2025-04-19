@@ -36,11 +36,11 @@ CREATE TABLE IF NOT EXISTS public.sessions (
   last_updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
   total_deep_work_minutes INTEGER DEFAULT 0, -- Aggregated from periods
   total_deep_rest_minutes INTEGER DEFAULT 0, -- Aggregated from periods
-  status TEXT CHECK (status IN ('not_started', 'in_progress', 'completed', 'cancelled')) DEFAULT 'not_started',
+  status TEXT CHECK (status IN ('not_started', 'in_progress', 'completed', 'cancelled')) DEFAULT 'not_started', -- Timer Status
   cancelled_reason TEXT, -- Only if cancelled
   completed BOOLEAN DEFAULT false, -- Ref: 1.6.7.3 - Track completion status
   user_notes TEXT, -- Ref: 1.6.8.2 - Optional notes for the entire session
-  distraction_reasons_selected TEXT[], -- Ref: 1.6.1.3.1.2 - Single reasons for ending early
+  distraction_reasons_selected TEXT[] -- Ref: 1.6.1.3.1.2 - Single reasons for ending early
 );
 
 -- Unified periods table for both work and rest

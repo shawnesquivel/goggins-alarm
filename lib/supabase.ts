@@ -196,7 +196,10 @@ export async function checkConnection() {
       .limit(1);
 
     if (usersError) {
-      console.error("Users table query failed:", usersError);
+      console.error(
+        "Test connection failed: Users table query failed:",
+        usersError
+      );
     }
 
     return true;

@@ -57,15 +57,9 @@ export default function StartSessionScreen({
     if (taskDescription && selectedProjectId && !isNavigating) {
       setIsNavigating(true);
       try {
-        console.log("[StartSessionScreen] Beginning start session flow");
-
         // Mark onboarding as complete first
         await completeOnboarding();
         console.log("[StartSessionScreen] Onboarding marked as complete");
-
-        // Start the focus session
-        startFocusSession(taskDescription, selectedProjectId, []);
-        console.log("[StartSessionScreen] Focus session started");
 
         // Close the modal
         setShowModal(false);
@@ -190,7 +184,7 @@ export default function StartSessionScreen({
                     onPress={handleStartSession}
                   >
                     <Text className="text-white text-base font-bold">
-                      START SESSION
+                      FINISH SETUP
                     </Text>
                   </TouchableOpacity>
                 </View>

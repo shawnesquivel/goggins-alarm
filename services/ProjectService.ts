@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "@/lib/supabase";
 import { Project } from "@/types/project";
 import { AppState } from "react-native";
+import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
 
 // Storage keys
@@ -385,12 +386,6 @@ export const ProjectService = {
       if (error) throw error;
       if (!remoteProjects) return [];
 
-      console.log("Remote projects:", remoteProjects);
-
-      // Get current local projects
-      const localProjects = await this.getLocalProjects();
-      console.log("Local projects before sync:", localProjects);
-
       // Replace local projects with remote projects
       const mergedProjects = remoteProjects.map((project) => ({
         id: project.id,
@@ -404,7 +399,6 @@ export const ProjectService = {
       // Save merged result to local storage
       await this.saveLocalProjects(mergedProjects);
 
-      console.log("Synced projects:", mergedProjects);
       return mergedProjects;
     } catch (error) {
       console.warn("Project sync failed:", error);

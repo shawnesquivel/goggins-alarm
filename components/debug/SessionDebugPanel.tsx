@@ -24,7 +24,7 @@ export default function SessionDebugPanel({
     SessionPendingOperation[]
   >([]);
   const [expanded, setExpanded] = useState(false);
-  const { cancelSession } = usePomodoro();
+  const { finishSession } = usePomodoro();
 
   const loadSessionData = async () => {
     try {
@@ -69,8 +69,8 @@ export default function SessionDebugPanel({
       await SessionService.setCurrentSession(null);
 
       // 4. Force context reset
-      if (cancelSession) {
-        await cancelSession();
+      if (finishSession) {
+        await finishSession(false);
       }
 
       console.log("❗ forceCompleteReset: Finished");

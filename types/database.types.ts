@@ -215,7 +215,7 @@ export type Database = {
         Row: {
           cancelled_reason_details: string | null;
           cancelled_reasons: string[] | null;
-          completed: boolean | null;
+          task_completed: boolean | null;
           created_at: string | null;
           distraction_reasons_selected: string[] | null;
           id: string;
@@ -233,7 +233,7 @@ export type Database = {
         Insert: {
           cancelled_reason_details?: string | null;
           cancelled_reasons?: string[] | null;
-          completed?: boolean | null;
+          task_completed?: boolean | null;
           created_at?: string | null;
           distraction_reasons_selected?: string[] | null;
           id?: string;
@@ -251,7 +251,7 @@ export type Database = {
         Update: {
           cancelled_reason_details?: string | null;
           cancelled_reasons?: string[] | null;
-          completed?: boolean | null;
+          task_completed?: boolean | null;
           created_at?: string | null;
           distraction_reasons_selected?: string[] | null;
           id?: string;
