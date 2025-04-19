@@ -61,7 +61,9 @@ const OverviewTab = () => {
             {isAnalyticsLoading ? "..." : analytics.deepWorkSessions}
           </Text>
           <Text className="text-base w-12 text-center">
-            {isAnalyticsLoading ? "..." : analytics.deepWorkMinutes}
+            {isAnalyticsLoading
+              ? "..."
+              : Number(analytics.deepWorkMinutes).toFixed(1)}
           </Text>
         </View>
       </View>
@@ -75,7 +77,9 @@ const OverviewTab = () => {
             {isAnalyticsLoading ? "..." : analytics.deepRestSessions}
           </Text>
           <Text className="text-base w-12 text-center">
-            {isAnalyticsLoading ? "..." : analytics.deepRestMinutes}
+            {isAnalyticsLoading
+              ? "..."
+              : Number(analytics.deepRestMinutes).toFixed(1)}
           </Text>
         </View>
       </View>
