@@ -297,7 +297,7 @@ export const AnalyticsService = {
           created_at, 
           status,
           project_id,
-          projects(name, color)
+          project:project_id(id, name, color)
         `
         )
         .eq("user_id", authData.user.id)
@@ -310,23 +310,29 @@ export const AnalyticsService = {
       }
 
       // Transform data to match Session type
-      return (data || []).map((session) => ({
-        id: session.id,
-        task: session.task,
-        total_deep_work_minutes: session.total_deep_work_minutes,
-        created_at: session.created_at,
-        status: session.status,
-        project_id: session.project_id,
-        project:
-          session.projects &&
-          Array.isArray(session.projects) &&
-          session.projects.length > 0
-            ? {
-                name: session.projects[0].name,
-                color: session.projects[0].color || "#808080",
-              }
+      return (data || []).map((session) => {
+        return {
+          id: session.id,
+          task: session.task,
+          total_deep_work_minutes: session.total_deep_work_minutes,
+          created_at: session.created_at,
+          status: session.status,
+          project_id: session.project_id,
+          project: session.project
+            ? Array.isArray(session.project)
+              ? session.project.length > 0
+                ? {
+                    name: session.project[0].name,
+                    color: session.project[0].color || "#808080",
+                  }
+                : undefined
+              : {
+                  name: (session.project as any).name,
+                  color: (session.project as any).color || "#808080",
+                }
             : undefined,
-      }));
+        };
+      });
     } catch (error) {
       console.error("Error in getRecentSessions:", error);
       return [];

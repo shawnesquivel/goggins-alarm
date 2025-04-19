@@ -16,10 +16,29 @@ export default function useSessions(limit: number = 20) {
       setError(null);
 
       const data = await AnalyticsService.getRecentSessions(limit);
-      setSessions(data);
+
+      // Ensure project colors are set properly
+      const processedData = data.map((session) => {
+        // If project exists but color is missing, set a default color
+        if (session.project && !session.project.color) {
+          console.log(
+            `[useSessions] Session ${session.id} has project but missing color, using default`
+          );
+          return {
+            ...session,
+            project: {
+              ...session.project,
+              color: "#808080", // Default gray color
+            },
+          };
+        }
+        return session;
+      });
+
+      setSessions(processedData);
 
       // Group sessions by date
-      const grouped = groupSessionsByDate(data);
+      const grouped = groupSessionsByDate(processedData);
       setSessionSections(grouped);
     } catch (err) {
       console.error("Error fetching sessions:", err);

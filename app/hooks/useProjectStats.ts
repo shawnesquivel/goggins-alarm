@@ -50,9 +50,6 @@ export function useProjectStats(
           AnalyticsService.getRestStats(timeframe, selectedDate),
         ]);
 
-        console.log("[useProjectStats] Project stats:", projectStats);
-        console.log("[useProjectStats] Rest data:", restData);
-
         // Transform stats into the format PieChart expects
         const formattedData = projectStats.map((project) => ({
           name: project.name,
