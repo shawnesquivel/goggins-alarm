@@ -1,8 +1,17 @@
-import { Modal, Text, View, TouchableOpacity, TextInput } from "react-native";
+import {
+  Modal,
+  Text,
+  View,
+  TouchableOpacity,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
 import { CancelFlowStep } from "@/constants/CancelFlowStep";
 import { usePomodoro } from "@/contexts/AlarmContext";
 import { formatTimeSummary } from "@/lib/time";
 import FontAwesome from "@expo/vector-icons/build/FontAwesome";
+import { useState } from "react";
 
 interface SessionCompleteModalProps {
   setCancelFlowStep: (step: CancelFlowStep) => void;
@@ -12,7 +21,7 @@ interface SessionCompleteModalProps {
   isNoteExpanded: boolean;
   sessionNotes: string;
   setSessionNotes: (notes: string) => void;
-  handleFinalizeSession: () => void;
+  handleFinalizeSession: () => Promise<boolean>;
   setIsNoteExpanded: (expanded: boolean) => void;
 }
 
@@ -28,6 +37,38 @@ const SessionCompleteModal = ({
   setIsNoteExpanded,
 }: SessionCompleteModalProps) => {
   const { currentSession } = usePomodoro();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasError, setHasError] = useState(false);
+
+  const handleComplete = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    setHasError(false);
+
+    try {
+      const success = await handleFinalizeSession();
+      if (!success) {
+        setHasError(true);
+        setIsSubmitting(false);
+        Alert.alert(
+          "Connection Error",
+          "We couldn't save your session. Please check your connection and try again.",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (error) {
+      console.error("Error finalizing session:", error);
+      setHasError(true);
+      setIsSubmitting(false);
+      Alert.alert(
+        "Connection Error",
+        "We couldn't save your session. Please check your connection and try again.",
+        [{ text: "OK" }]
+      );
+    }
+  };
+
   return (
     <Modal
       transparent={true}
@@ -117,12 +158,30 @@ const SessionCompleteModal = ({
 
           {/* Complete Session Button */}
           <TouchableOpacity
-            className="bg-black py-4 rounded-lg"
-            onPress={handleFinalizeSession}
+            className={`${
+              hasError ? "bg-red-500" : "bg-black"
+            } py-4 rounded-lg ${isSubmitting ? "opacity-70" : ""}`}
+            onPress={handleComplete}
+            disabled={isSubmitting}
           >
-            <Text className="text-white text-center font-medium">
-              COMPLETE SESSION
-            </Text>
+            <View className="flex-row justify-center items-center">
+              {isSubmitting ? (
+                <View className="flex-row items-center">
+                  <ActivityIndicator
+                    size="small"
+                    color="white"
+                    style={{ marginRight: 8 }}
+                  />
+                  <Text className="text-white text-center font-medium">
+                    COMPLETING...
+                  </Text>
+                </View>
+              ) : (
+                <Text className="text-white text-center font-medium">
+                  {hasError ? "RETRY SUBMISSION" : "COMPLETE SESSION"}
+                </Text>
+              )}
+            </View>
           </TouchableOpacity>
         </View>
       </View>
