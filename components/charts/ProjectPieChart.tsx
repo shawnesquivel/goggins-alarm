@@ -1,14 +1,13 @@
 // components/charts/ProjectPieChart.tsx
-import React, { useEffect, useState } from "react";
-import { View, Text, Dimensions } from "react-native";
+import React from "react";
+import { View, Text, Dimensions, ActivityIndicator } from "react-native";
 import { PieChart } from "react-native-chart-kit";
 import {
   LibreCaslonText_400Regular,
   LibreCaslonText_700Bold,
   useFonts,
 } from "@expo-google-fonts/libre-caslon-text";
-import { AnalyticsService } from "@/services/AnalyticsService";
-import { startOfWeek, endOfWeek } from "date-fns";
+import { useProjectStats } from "@/app/hooks/useProjectStats";
 
 // Add this helper function to format total time
 const formatTotalTime = (totalMinutes: number) => {
@@ -31,45 +30,16 @@ export const ProjectPieChart = ({ selectedWeek }: ProjectPieChartProps) => {
     "LibreCaslonText-Bold": LibreCaslonText_700Bold,
   });
 
-  const [projectData, setProjectData] = useState<
-    {
-      name: string;
-      population: number;
-      color: string;
-      legendFontColor: string;
-    }[]
-  >([]);
-
-  const [restStats, setRestStats] = useState<{
-    totalSessions: number;
-    totalMinutes: number;
-  }>({ totalSessions: 0, totalMinutes: 0 });
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const [projectStats, restData] = await Promise.all([
-        AnalyticsService.getProjectTimeStats("week", selectedWeek),
-        AnalyticsService.getRestStats("week", selectedWeek),
-      ]);
-
-      // Transform stats into the format PieChart expects
-      const formattedData = projectStats.map((project) => ({
-        name: project.name,
-        population: Math.round(project.totalMinutes), // Round to avoid floating point issues
-        color: project.color || "#73AEA4", // Use project color or fallback
-        legendFontColor: "#333",
-      }));
-
-      console.log("Selected week:", selectedWeek);
-      console.log("Formatted pie chart data:", formattedData);
-      console.log("Rest stats:", restData);
-
-      setProjectData(formattedData);
-      setRestStats(restData);
-    };
-
-    fetchData();
-  }, [selectedWeek]); // Re-fetch when selectedWeek changes
+  // Use the custom hook instead of direct fetch
+  const {
+    projectData,
+    restStats,
+    isLoading,
+    error,
+    totalMinutes,
+    formattedTotalTime,
+    formattedRestTime,
+  } = useProjectStats("week", selectedWeek);
 
   // Center the chart
   const chartConfig = {
@@ -110,7 +80,9 @@ export const ProjectPieChart = ({ selectedWeek }: ProjectPieChartProps) => {
                   className="text-xs text-[#666]"
                   style={{ fontFamily: "Figtree_400Regular" }}
                 >
-                  {Math.floor(item.population / 60)}h {item.population % 60}m
+                  {Math.floor(item.population / 60)}h{" "}
+                  {Math.floor(item.population % 60)}m{" "}
+                  {Math.floor((item.population % 1) * 60)}s
                 </Text>
               </View>
             </View>
@@ -136,7 +108,9 @@ export const ProjectPieChart = ({ selectedWeek }: ProjectPieChartProps) => {
                   className="text-xs text-[#666]"
                   style={{ fontFamily: "Figtree_400Regular" }}
                 >
-                  {Math.floor(item.population / 60)}h {item.population % 60}m
+                  {Math.floor(item.population / 60)}h{" "}
+                  {Math.floor(item.population % 60)}m{" "}
+                  {Math.floor((item.population % 1) * 60)}s
                 </Text>
               </View>
             </View>
@@ -146,16 +120,31 @@ export const ProjectPieChart = ({ selectedWeek }: ProjectPieChartProps) => {
     );
   };
 
-  // Calculate total time from data
-  const totalMinutes = projectData.reduce(
-    (acc, item) => acc + item.population,
-    0
-  );
+  // Show loading indicator while data is loading
+  if (!fontsLoaded || isLoading) {
+    return (
+      <View className="items-center justify-center bg-[#FAF9F6] rounded-lg p-8">
+        <ActivityIndicator size="large" color="#000" />
+        <Text
+          className="mt-4 text-[#666]"
+          style={{ fontFamily: "Figtree_400Regular" }}
+        >
+          Loading chart data...
+        </Text>
+      </View>
+    );
+  }
 
-  if (!fontsLoaded) {
+  // Show error message if there was an error
+  if (error) {
     return (
       <View className="items-center justify-center bg-[#FAF9F6] rounded-lg p-4">
-        <Text>Loading fonts...</Text>
+        <Text
+          className="text-red-500"
+          style={{ fontFamily: "Figtree_400Regular" }}
+        >
+          Error loading data. Please try again.
+        </Text>
       </View>
     );
   }
@@ -216,7 +205,7 @@ export const ProjectPieChart = ({ selectedWeek }: ProjectPieChartProps) => {
             className="text-2xl mt-2"
             style={{ fontFamily: "LibreCaslonText" }}
           >
-            {formatTotalTime(totalMinutes)}
+            {formattedTotalTime}
           </Text>
         </View>
 
@@ -243,7 +232,7 @@ export const ProjectPieChart = ({ selectedWeek }: ProjectPieChartProps) => {
               className="text-3xl text-black mb-1"
               style={{ fontFamily: "LibreCaslonText" }}
             >
-              {formatTotalTime(totalMinutes)}
+              {formattedTotalTime}
             </Text>
             <Text
               className="text-sm text-[#333] text-center uppercase"
@@ -269,7 +258,7 @@ export const ProjectPieChart = ({ selectedWeek }: ProjectPieChartProps) => {
               className="text-3xl text-black mb-1"
               style={{ fontFamily: "LibreCaslonText" }}
             >
-              {formatTotalTime(restStats.totalMinutes)}
+              {formattedRestTime}
             </Text>
             <Text
               className="text-sm text-[#333] text-center uppercase"
