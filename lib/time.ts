@@ -1,9 +1,22 @@
 import { format } from "date-fns";
 
+/**
+ * Formats minutes into a time summary string
+ * @param minutes - Number of minutes to format
+ * @returns Formatted string in the format "0:SS", "MM:SS", or "H:MM" depending on duration
+ */
 export const formatTimeSummary = (minutes: number): string => {
-  if (minutes < 60) {
-    return `${Math.floor(minutes)}:00`;
+  if (minutes < 1) {
+    // Less than 1 minute - show as 0:SS
+    const seconds = Math.floor(minutes * 60);
+    return `0:${seconds.toString().padStart(2, "0")}`;
+  } else if (minutes < 60) {
+    // Between 1 and 60 minutes - show as MM:SS
+    const mins = Math.floor(minutes);
+    const seconds = Math.floor((minutes - mins) * 60);
+    return `${mins}:${seconds.toString().padStart(2, "0")}`;
   } else {
+    // More than 60 minutes - show as H:MM
     const hours = Math.floor(minutes / 60);
     const mins = Math.floor(minutes % 60);
     return `${hours}:${mins.toString().padStart(2, "0")}`;
@@ -11,10 +24,10 @@ export const formatTimeSummary = (minutes: number): string => {
 };
 
 /**
- *
- * @param seconds
- *  // Format remaining time as mm:ss
- * @returns
+ * Formats seconds into a time display string with optional overtime indicator
+ * @param seconds - Number of seconds to format
+ * @param isOvertime - Whether to show overtime indicator
+ * @returns Formatted string in the format "MM:SS" with optional "+" prefix
  */
 export const formatTimeDisplay = (
   seconds: number,
@@ -39,7 +52,11 @@ export const formatDurationForExport = (seconds: number): string => {
   return `${hours}h ${minutes}m`;
 };
 
-// Format time only for the session list items
+/**
+ * Formats a date string to display only the time in 12-hour format
+ * @param dateString - Date string to format
+ * @returns Formatted time string in lowercase (e.g. "2:30 pm")
+ */
 export const formatTime = (dateString: string) => {
   const date = new Date(dateString);
   return format(date, "h:mm a").toLowerCase();
