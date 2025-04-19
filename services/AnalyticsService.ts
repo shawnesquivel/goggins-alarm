@@ -54,7 +54,7 @@ export const AnalyticsService = {
           .from("periods")
           .select("*, sessions!inner(user_id, status)")
           .eq("sessions.user_id", authData.user.id)
-          .neq("sessions.status", "cancelled")
+          .in("sessions.status", ["completed", "cancelled"])
           .gte("created_at", startOfDay)
           .lte("created_at", endOfDay);
 
