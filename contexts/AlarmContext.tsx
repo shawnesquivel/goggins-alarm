@@ -43,7 +43,7 @@ interface PomodoroContextType {
   pauseSession: () => void;
   resumeSession: () => void;
   startBreakSession: () => void;
-  cancelSession: () => Promise<void>;
+  finishSession: (taskCompleted: boolean) => Promise<void>;
 
   // Settings
   settings: TimerSettings;
@@ -196,7 +196,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     timerRef.current = setInterval(() => {
       setRemainingSeconds((prev) => {
         if (prev <= 0 && !isOvertimeRef.current) {
-          playTimerCompleteSound();
           isOvertimeRef.current = true;
           setIsOvertime(true);
           console.log("Timer completed, entering overtime mode");
@@ -217,20 +216,23 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Sound functions
-  const playTimerCompleteSound = async () => {
-    try {
-      console.log("⚠️ Stub: Current isOvertime state:", isOvertime);
-      // const { sound } = await Audio.Sound.createAsync(
-      //   require("@/assets/sounds/timer-complete.mp3")
-      // );
-      // soundRef.current = sound;
-      // await sound.playAsync();
-    } catch (error) {
-      console.error("Error playing sound:", error);
-    }
+  const pauseSession = () => {
+    console.log("AlarmContext: Pausing session");
+    stopTimer();
+    setTimerStatus(TimerStatus.PAUSED);
+
+    // Note: For MVP, we're not recording pauses in the database
+    // Future enhancement could be to track pause times
   };
 
+  const resumeSession = () => {
+    console.log("AlarmContext: Resuming session");
+    setTimerStatus(TimerStatus.RUNNING);
+    startTimer();
+
+    // Note: For MVP, we're not recording resumes in the database
+    // Future enhancement could be to track pause durations
+  };
   // Session management
   const startFocusSession = async (
     taskDescription: string,
@@ -269,8 +271,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         status: "in_progress",
       });
 
-      console.log("AlarmContext: Created session in DB", newSession.id);
-
       // Create work period
       await SessionService.createPeriod({
         session_id: newSession.id,
@@ -300,24 +300,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     startTimer();
   };
 
-  const pauseSession = () => {
-    console.log("AlarmContext: Pausing session");
-    stopTimer();
-    setTimerStatus(TimerStatus.PAUSED);
-
-    // Note: For MVP, we're not recording pauses in the database
-    // Future enhancement could be to track pause times
-  };
-
-  const resumeSession = () => {
-    console.log("AlarmContext: Resuming session");
-    setTimerStatus(TimerStatus.RUNNING);
-    startTimer();
-
-    // Note: For MVP, we're not recording resumes in the database
-    // Future enhancement could be to track pause durations
-  };
-
   const completeWorkPeriod = async (
     rating?: number,
     notes?: string,
@@ -340,14 +322,12 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     );
 
     // Update work period
-    console.log("Updating period from AlarmContext.completeWorkPeriod");
     await SessionService.updatePeriod(
       currentPeriod.id,
       {
         actual_duration_minutes: actualSeconds / 60,
         ended_at: endTime.toISOString(),
         quality_rating: rating || null,
-        user_notes: notes || null,
       },
       !startBreak
     );
@@ -402,7 +382,6 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     );
 
     // Update rest period
-    console.log("Updating period from AlarmContext.completeRestPeriod");
     await SessionService.updatePeriod(
       currentPeriod.id,
       {
@@ -495,7 +474,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       JSON.stringify(newSession)
     );
 
-    // Start timer
+    // Auto start timer
     startTimer();
   };
 
@@ -578,8 +557,10 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     };
   };
 
-  const cancelSession = async () => {
-    console.log("AlarmContext: Cancelling session", currentSession?.id);
+  const finishSession = async (taskCompleted?: boolean) => {
+    console.log(
+      `AlarmContext: Finishing session ${currentSession?.id}, task_completed: ${taskCompleted}`
+    );
 
     if (!currentSession) return;
 
@@ -590,26 +571,20 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
     const sessionId = currentSession.id;
 
     try {
-      // First mark the session as cancelled in database
-      await SessionService.updateSession(sessionId, {
-        status: "cancelled",
-        completed: false,
-      });
-
       // IMPORTANT: Update the local session object in AsyncStorage directly
       // This ensures even with a fast refresh, the app won't restart the timer
       const modifiedSession = {
         ...currentSession,
-        isCompleted: true, // Mark as completed in UI state
-        status: "cancelled", // Add status to UI state
+        isCompleted: true, // Mark as completed in UI state (this is different from task_completed)
+        status: "completed", // Set correct status based on whether task was completed
       };
       await AsyncStorage.setItem(
         STORAGE_KEYS.CURRENT_SESSION,
         JSON.stringify(modifiedSession)
       );
 
-      // Now clean up all state
-      await SessionService.completeSessionLifecycle(sessionId);
+      // Use the new method to complete the session with the correct status
+      await SessionService.completeSession(sessionId, taskCompleted || false);
 
       // Update UI state
       setCurrentSession(null);
@@ -617,12 +592,9 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       setIsOvertime(false);
       isOvertimeRef.current = false;
 
-      // Force a short delay to ensure AsyncStorage operations complete
-      await new Promise((resolve) => setTimeout(resolve, 100));
-
-      console.log("❗ COMPLETE STATE RESET PERFORMED");
+      console.info("❗ [AlarmContext.finishSession] Cleaned up UI");
     } catch (error) {
-      console.error("Error cancelling session:", error);
+      console.error("Error finishing session:", error);
     }
   };
 
@@ -692,7 +664,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
       JSON.stringify(workSession)
     );
 
-    // Start the timer
+    // Auto start timer
     startTimer();
   };
 
@@ -710,7 +682,7 @@ export function PomodoroProvider({ children }: { children: React.ReactNode }) {
         pauseSession,
         resumeSession,
         startBreakSession,
-        cancelSession,
+        finishSession,
 
         // Settings
         settings,

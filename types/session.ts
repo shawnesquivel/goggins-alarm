@@ -94,6 +94,7 @@ export interface SessionServiceInterface {
 
   completeSessionLifecycle(sessionId: string): Promise<boolean>;
   setupBackgroundSync(intervalMinutes?: number): Promise<void>;
+  completeSession(sessionId: string, taskCompleted: boolean): Promise<boolean>;
 }
 
 export interface SessionSection {

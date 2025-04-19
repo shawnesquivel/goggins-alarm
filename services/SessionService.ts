@@ -28,7 +28,7 @@ export const SessionService: SessionServiceInterface = {
       status: sessionData.status || "in_progress",
       total_deep_work_minutes: 0,
       total_deep_rest_minutes: 0,
-      completed: false,
+      task_completed: false,
     } as DbSession;
 
     // Save locally first
@@ -320,7 +320,6 @@ export const SessionService: SessionServiceInterface = {
           type: "update_period",
           data: {
             id: period.id,
-            completed: true,
             ended_at: period.ended_at,
             actual_duration_minutes: period.actual_duration_minutes,
             last_updated_at: period.last_updated_at,
@@ -644,5 +643,30 @@ export const SessionService: SessionServiceInterface = {
         console.error("Background sync error:", error);
       }
     }, intervalMinutes * 60 * 1000);
+  },
+
+  /**
+   * Completes a session with the correct completion status.
+   * This handles both successfully completed sessions and cancelled sessions.
+   * @param sessionId The ID of the session to complete
+   * @param taskCompleted Whether the user successfully completed their task/goal (true) or ended early (false)
+   */
+  async completeSession(
+    sessionId: string,
+    taskCompleted: boolean
+  ): Promise<boolean> {
+    try {
+      // First update the session with the correct status and task_completed flag
+      await this.updateSession(sessionId, {
+        status: taskCompleted ? "completed" : "cancelled",
+        task_completed: taskCompleted, // Renamed from completed to task_completed
+      });
+
+      // Then proceed with the lifecycle cleanup (sync and state clearing)
+      return await this.completeSessionLifecycle(sessionId);
+    } catch (error) {
+      console.error("Error in completeSession:", error);
+      return false;
+    }
   },
 };

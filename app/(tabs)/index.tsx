@@ -34,7 +34,7 @@ export default function TimerScreen() {
     completeWorkPeriod,
     completeRestPeriod,
     isOvertime,
-    cancelSession,
+    finishSession,
   } = usePomodoro();
   const { session } = useAuth();
 
@@ -449,7 +449,6 @@ export default function TimerScreen() {
         // Update period with duration and rating
         // Note: We don't sync to Supabase here to reduce network calls.
         // All period updates will be synced during completeSessionWithReflection.
-        console.log("Updating period from handleCancelFlowFocusRating");
         await SessionService.updatePeriod(
           currentPeriod.id,
           {
@@ -513,6 +512,8 @@ export default function TimerScreen() {
         quality_rating: options.rating || null,
         rest_activities_selected: options.activity ? [options.activity] : null,
         // Explicitly set to null for rest periods
+
+        // wrong: should be determined if actual Time >= planned_time.
         work_time_completed:
           currentPeriod.type === "work" ? options.isTaskComplete : null,
       };
@@ -528,12 +529,11 @@ export default function TimerScreen() {
         options.sessionId
       );
 
-      console.log("notes: ", options.notes);
-
+      console.log("Received isTaskComplete: ", options.isTaskComplete);
       // Update session with reflection data and totals
       await SessionService.updateSession(options.sessionId, {
         status: options.isTaskComplete ? "completed" : "cancelled",
-        completed: options.isTaskComplete,
+        task_completed: options.isTaskComplete,
         distraction_reasons_selected: options.reasons,
         user_notes: options.notes || null,
         total_deep_work_minutes: totals.total_deep_work_minutes,
@@ -546,7 +546,7 @@ export default function TimerScreen() {
 
       // Call the context's cancelSession to clean up UI state
       try {
-        await cancelSession();
+        await finishSession(options.isTaskComplete);
       } catch (error) {
         console.error("Error cancelling session:", error);
         setError(`Error cancelling session ${error}`);
@@ -569,6 +569,9 @@ export default function TimerScreen() {
   // Update handleFinalizeSession to use the new SessionService method
   const handleFinalizeSession = async () => {
     if (!currentSession) {
+      console.warn(
+        "[handleFinalizeSession] Called without a current session. Setting flow step to none."
+      );
       setCancelFlowStep(CancelFlowStep.NONE);
       return;
     }
@@ -586,9 +589,6 @@ export default function TimerScreen() {
 
       // Then use the new SessionService method to ensure proper cleanup
       await SessionService.completeSessionLifecycle(currentSession.id);
-
-      // Call context's cancelSession to update UI state
-      await cancelSession();
     } catch (error) {
       console.error("Error during session finalization:", error);
 
