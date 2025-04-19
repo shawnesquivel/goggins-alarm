@@ -2,6 +2,7 @@ import { Text, View, TouchableOpacity } from "react-native";
 import useAnalytics from "@/app/hooks/useAnalytics";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import ProgressCircle from "./ProgressCircle";
+import { useEffect } from "react";
 
 /**
  * Overview Tab on HomeScreen component
@@ -25,7 +26,9 @@ const OverviewTab = () => {
 
       <View className="flex-row justify-end mb-4">
         <TouchableOpacity
-          onPress={handleRefresh}
+          onPress={() => {
+            handleRefresh();
+          }}
           disabled={isAnalyticsLoading}
           className="p-2"
         >

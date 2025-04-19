@@ -54,7 +54,7 @@ export const AnalyticsService = {
           .from("periods")
           .select("*, sessions!inner(user_id, status)")
           .eq("sessions.user_id", authData.user.id)
-          .neq("sessions.status", "cancelled")
+          .in("sessions.status", ["completed", "cancelled"])
           .gte("created_at", startOfDay)
           .lte("created_at", endOfDay);
 
@@ -65,18 +65,16 @@ export const AnalyticsService = {
     }
 
     // Calculate metrics at period level
-    const workPeriods = periods.filter(
-      (p) => p.type === "work" && p.work_time_completed === true
-    ).length;
+    const workPeriods = periods.filter((p) => p.type === "work").length;
 
     const workMinutes = periods
-      .filter((p) => p.type === "work" && p.work_time_completed === true)
+      .filter((p) => p.type === "work")
       .reduce((sum, p) => sum + (p.actual_duration_minutes || 0), 0);
 
     // Format total deep work time
     const hours = Math.floor(workMinutes / 60);
     const minutes = Math.floor(workMinutes % 60);
-    const seconds = Math.round((workMinutes * 60) % 60);
+    const seconds = Math.floor((workMinutes * 60) % 60);
     const formattedTotal = `${hours}:${minutes
       .toString()
       .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
@@ -98,9 +96,9 @@ export const AnalyticsService = {
     return {
       totalDeepWork: formattedTotal,
       deepWorkSessions: workPeriods,
-      deepWorkMinutes: Math.round(workMinutes),
-      deepRestSessions: restPeriods, // Use calculated value
-      deepRestMinutes: Math.round(restMinutes), // Use calculated value
+      deepWorkMinutes: workMinutes,
+      deepRestSessions: restPeriods,
+      deepRestMinutes: restMinutes,
       goalProgressPercentage: goalPercentage,
     };
   },
@@ -135,26 +133,26 @@ export const AnalyticsService = {
       if (!authData?.user) return { totalSessions: 0, totalMinutes: 0 };
 
       // Query sessions table directly for rest periods
-      const { data: sessions } = await supabase
+      const { data: sessions, error } = await supabase
         .from("sessions")
         .select("total_deep_rest_minutes")
         .eq("user_id", authData.user.id)
-        .eq("status", "completed")
+        .in("status", ["completed", "cancelled"])
         .gt("total_deep_rest_minutes", 0)
         .gte("created_at", startDate.toISOString())
         .lte("created_at", now.toISOString());
 
       if (!sessions) return { totalSessions: 0, totalMinutes: 0 };
 
-      const totalMinutes = sessions.reduce(
-        (sum, session) =>
-          sum + (parseFloat(session.total_deep_rest_minutes) || 0),
-        0
-      );
+      const totalMinutes = sessions.reduce((sum, session) => {
+        // Force to number and preserve decimal precision
+        const minutes = parseFloat(session.total_deep_rest_minutes) || 0;
+        return sum + minutes;
+      }, 0);
 
       return {
         totalSessions: sessions.length,
-        totalMinutes: Math.round(totalMinutes),
+        totalMinutes: totalMinutes,
       };
     } catch (error) {
       console.error("Error getting rest stats:", error);
@@ -212,7 +210,7 @@ export const AnalyticsService = {
         `
         )
         .eq("user_id", authData.user.id)
-        .eq("status", "completed")
+        .in("status", ["completed", "cancelled"])
         .gte("created_at", startDate.toISOString())
         .lte("created_at", now.toISOString());
 
@@ -259,8 +257,9 @@ export const AnalyticsService = {
             };
           }
 
-          acc[session.project_id].totalMinutes +=
-            parseFloat(session.total_deep_work_minutes) || 0;
+          // Parse as float and don't round
+          const minutes = parseFloat(session.total_deep_work_minutes) || 0;
+          acc[session.project_id].totalMinutes += minutes;
 
           return acc;
         },
