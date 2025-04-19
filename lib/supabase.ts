@@ -13,8 +13,7 @@ export function getSupabaseKeys() {
 
   if (!supabaseUrl || !supabaseAnonKey) {
     if (__DEV__) {
-      console.log({ supabaseUrl });
-      console.log({ supabaseAnonKey });
+      console.info({ supabaseUrl, supabaseAnonKey });
     }
     throw new Error(
       "Missing Supabase URL or anonymous key. Please check your environment variables."
