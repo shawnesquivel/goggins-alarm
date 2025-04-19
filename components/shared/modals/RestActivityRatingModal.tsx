@@ -1,6 +1,12 @@
-import { View, Text, TouchableOpacity, Modal } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  ActivityIndicator,
+} from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import { restActivitiesIcons } from "@/constants/CancelFlowStep";
 
 interface RestActivityRatingModalProps {
@@ -13,6 +19,15 @@ interface RestActivityRatingModalProps {
 export const RestActivityRatingModal: React.FC<
   RestActivityRatingModalProps
 > = ({ onClose, onSelectActivity, selectedActivity, mode }) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleActivitySelect = (id: string) => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+    onSelectActivity(id);
+  };
+
   return (
     <Modal
       animationType="slide"
@@ -43,7 +58,9 @@ export const RestActivityRatingModal: React.FC<
                   ? "bg-gray-200 border border-gray-300"
                   : "bg-gray-100"
               } flex-row justify-between items-center`}
-              onPress={() => onSelectActivity(id)}
+              onPress={() => handleActivitySelect(id)}
+              disabled={isSubmitting}
+              style={{ opacity: isSubmitting ? 0.6 : 1 }}
             >
               <View className="flex-row items-center">
                 <FontAwesome
@@ -54,9 +71,12 @@ export const RestActivityRatingModal: React.FC<
                 />
                 <Text className="text-base text-gray-800">{id}</Text>
               </View>
-              {selectedActivity === id && (
-                <FontAwesome name="check" size={16} color="#666" />
-              )}
+              {selectedActivity === id &&
+                (isSubmitting ? (
+                  <ActivityIndicator size="small" color="#666" />
+                ) : (
+                  <FontAwesome name="check" size={16} color="#666" />
+                ))}
             </TouchableOpacity>
           ))}
         </View>
