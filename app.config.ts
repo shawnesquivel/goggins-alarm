@@ -18,7 +18,7 @@ export default {
     },
     plugins: ["expo-font", "expo-router"],
     android: {
-      package: "com.shawnesquivel.deepworktimer",
+      package: "app.deeptimer.focus",
     },
     ios: {
       bundleIdentifier: "app.deeptimer.focus",
