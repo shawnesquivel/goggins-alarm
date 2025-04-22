@@ -27,17 +27,7 @@ export default function Onboarding() {
   const renderScreen = () => {
     switch (currentScreen.type) {
       case OnboardingScreenType.SETUP:
-        if (currentScreen.id === "setup1") {
-          return (
-            <ProjectSetupScreen
-              screen={currentScreen}
-              currentStep={currentScreenIndex}
-              totalSteps={totalScreens}
-              onNext={nextScreen}
-              onBack={previousScreen}
-            />
-          );
-        } else if (currentScreen.id === "setup2") {
+        if (currentScreen.id === "setup2") {
           return (
             <TimerSetupScreen
               screen={currentScreen}
