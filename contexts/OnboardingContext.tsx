@@ -73,12 +73,6 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
       "Every day, you'll aim to hit your goal (1-3hrs) and build a streak.\n\nOur AI will track your stats over time, and help unlock your *10X* productivity.",
   },
   {
-    id: "setup1",
-    type: OnboardingScreenType.SETUP,
-    title: "Your focus areas",
-    description: "These will help you categorize your tasks.",
-  },
-  {
     id: "trial",
     type: OnboardingScreenType.TRIAL,
     title: "Start your free trial",
