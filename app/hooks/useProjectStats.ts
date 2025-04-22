@@ -83,3 +83,6 @@ export function useProjectStats(
     formattedRestTime: formatTotalTime(restStats.totalMinutes),
   };
 }
+
+// Add default export for expo-router compatibility
+export default useProjectStats;
