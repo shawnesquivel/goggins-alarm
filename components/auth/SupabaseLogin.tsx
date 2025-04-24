@@ -61,6 +61,25 @@ export default function Auth({ isOnboardingFlow = false }) {
     }
   }, [router, isOnboardingFlow]);
 
+  useEffect(() => {
+    const debugRedirectUrl =
+      Platform.OS === "web" && typeof window !== "undefined"
+        ? `${window.location.origin}/login-callback`
+        : Linking.createURL("login-callback");
+
+    console.log("OAUTH DEBUG - Platform:", Platform.OS);
+    console.log("OAUTH DEBUG - Redirect URL:", debugRedirectUrl);
+    console.log(
+      "OAUTH DEBUG - Window origin:",
+      Platform.OS === "web" && typeof window !== "undefined"
+        ? window.location.origin
+        : "N/A"
+    );
+
+    console.log("Starting Google sign-in with redirect URL:", debugRedirectUrl);
+    console.log("Supabase URL:", Constants.expoConfig?.extra?.supabaseUrl);
+  }, []);
+
   // Helper function to handle post-auth steps
   const handleSuccessfulAuth = async () => {
     try {
@@ -149,27 +168,55 @@ export default function Auth({ isOnboardingFlow = false }) {
 
   const signInWithGoogle = async () => {
     try {
+      // Using localhost:8081 redirect URL which is registered in Google Console
       const redirectUrl =
         Platform.OS === "web" && typeof window !== "undefined"
-          ? `${window.location.origin}/login-callback`
+          ? "http://localhost:8081/login-callback"
           : Linking.createURL("login-callback");
+
+      console.log("OAUTH DEBUG - Platform:", Platform.OS);
+      console.log("OAUTH DEBUG - Redirect URL:", redirectUrl);
+      console.log(
+        "OAUTH DEBUG - Window origin:",
+        Platform.OS === "web" && typeof window !== "undefined"
+          ? window.location.origin
+          : "N/A"
+      );
 
       console.log("Starting Google sign-in with redirect URL:", redirectUrl);
       console.log("Supabase URL:", Constants.expoConfig?.extra?.supabaseUrl);
 
+      // Explicitly use the web client ID
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
           redirectTo: redirectUrl,
-          // Only skip browser redirect for development
-          skipBrowserRedirect: __DEV__,
+          scopes: "email profile",
+          queryParams: {
+            // Force use of the web client ID instead of the iOS one
+            client_id:
+              "294468100097-e5e9pup377orojsl4ta6orga3n7nkdoq.apps.googleusercontent.com",
+            // Help debug OAuth flow
+            access_type: "offline",
+            prompt: "consent",
+            // Add additional debugging parameters
+            include_granted_scopes: "true",
+          },
+          skipBrowserRedirect: false,
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("OAuth error details:", error);
+        throw error;
+      }
+
       if (!data?.url) throw new Error("No auth URL received");
 
+      console.log("OAuth URL received:", data.url);
+
       if (Platform.OS === "web" && typeof window !== "undefined") {
+        // Navigate to the URL
         window.location.href = data.url;
       } else {
         const result = await WebBrowser.openAuthSessionAsync(
