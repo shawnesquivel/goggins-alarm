@@ -3,6 +3,7 @@ import { Project } from "@/types/project";
 import { PendingOperation, ProjectService } from "@/services/ProjectService";
 import { checkConnection } from "@/lib/supabase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useAuth } from "./AuthContext";
 
 interface ProjectContextType {
   projects: Project[];
@@ -24,6 +25,7 @@ interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export function ProjectProvider({ children }: { children: React.ReactNode }) {
+  const { session } = useAuth();
   useEffect(() => {
     const initializeOfflineMode = async () => {
       try {
@@ -155,8 +157,10 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     // Initialize listeners for sync
     ProjectService.initListeners();
 
-    // Sync on initial load
-    syncProjects();
+    if (session) {
+      // Sync on initial load
+      syncProjects();
+    }
   }, []);
 
   // Add this effect to load pending operations periodically

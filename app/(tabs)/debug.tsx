@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, Button, StyleSheet, ScrollView } from "react-native";
+
+import { View, Text, Button, ScrollView } from "react-native";
 import { ProjectService } from "@/services/ProjectService";
 import { Project } from "@/types/project";
 import ProjectTests from "@/services/ProjectServiceUtils";
@@ -135,12 +136,12 @@ export default function ProjectTestScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Project Service Test</Text>
+    <View className="flex-1 p-4 bg-gray-100">
+      <Text className="text-2xl font-bold my-4">Project Service Test</Text>
 
-      <Text style={styles.status}>{status}</Text>
+      <Text className="p-2 bg-gray-200 rounded mb-4">{status}</Text>
 
-      <View style={styles.buttonContainer}>
+      <View className="flex-row flex-wrap mb-4 gap-2">
         <Button
           title="Create Project"
           onPress={handleCreateProject}
@@ -169,11 +170,11 @@ export default function ProjectTestScreen() {
       </View>
 
       {selectedProject ? (
-        <View style={styles.selectedProject}>
-          <Text style={styles.selectedProjectTitle}>
+        <View className="bg-gray-200 p-4 rounded mb-4">
+          <Text className="text-base font-bold mb-2">
             Selected: {selectedProject.name}
           </Text>
-          <View style={styles.selectedProjectButtons}>
+          <View className="flex-row gap-2">
             <Button
               title="Update"
               onPress={handleUpdateSelectedProject}
@@ -194,22 +195,27 @@ export default function ProjectTestScreen() {
         </View>
       ) : null}
 
-      <ScrollView style={styles.projectList}>
-        <Text style={styles.subtitle}>Projects ({projects.length})</Text>
+      <ScrollView className="flex-1">
+        <Text className="text-lg font-bold my-2">
+          Projects ({projects.length})
+        </Text>
         {projects.map((project) => (
           <View
             key={project.id}
-            style={[
-              styles.projectItem,
-              { borderLeftColor: project.color || "#ccc" },
-            ]}
+            className="flex-row justify-between items-center p-4 bg-white rounded mb-2"
+            style={{
+              borderLeftWidth: 4,
+              borderLeftColor: project.color || "#ccc",
+            }}
           >
             <View>
-              <Text style={styles.projectName}>{project.name}</Text>
+              <Text className="text-base font-bold">{project.name}</Text>
               {project.goal ? (
-                <Text style={styles.projectGoal}>{project.goal}</Text>
+                <Text className="text-sm text-gray-600 my-1">
+                  {project.goal}
+                </Text>
               ) : null}
-              <Text style={styles.projectDate}>
+              <Text className="text-xs text-gray-400">
                 Updated: {project.updatedAt.toLocaleString()}
               </Text>
             </View>
@@ -224,74 +230,3 @@ export default function ProjectTestScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-    backgroundColor: "#f5f5f5",
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginVertical: 16,
-  },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginVertical: 8,
-  },
-  status: {
-    padding: 8,
-    backgroundColor: "#eee",
-    borderRadius: 4,
-    marginBottom: 16,
-  },
-  buttonContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginBottom: 16,
-    gap: 8,
-  },
-  projectList: {
-    flex: 1,
-  },
-  projectItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: "white",
-    borderRadius: 8,
-    marginBottom: 8,
-    borderLeftWidth: 4,
-  },
-  projectName: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  projectGoal: {
-    fontSize: 14,
-    color: "#666",
-    marginVertical: 4,
-  },
-  projectDate: {
-    fontSize: 12,
-    color: "#999",
-  },
-  selectedProject: {
-    backgroundColor: "#f0f0f0",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  selectedProjectTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 8,
-  },
-  selectedProjectButtons: {
-    flexDirection: "row",
-    gap: 8,
-  },
-});

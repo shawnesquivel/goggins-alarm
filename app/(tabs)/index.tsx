@@ -25,6 +25,7 @@ import FocusRatingModal from "@/components/shared/modals/FocusRatingModal";
 import OvertimeInfo from "@/components/cycle/OvertimeInfo";
 import HomeScreen from "@/components/cycle/HomeScreen";
 import { DbPeriodUpdate } from "@/types/session";
+import SupabaseLogin from "@/components/auth/SupabaseLogin";
 
 export default function TimerScreen() {
   const navigation = useNavigation();
@@ -603,6 +604,13 @@ export default function TimerScreen() {
       setShowBreakRatingModal(false);
     }
   };
+
+  if (!session)
+    return (
+      <View className="w-full mt-32">
+        <SupabaseLogin isOnboardingFlow={false} />
+      </View>
+    );
 
   return isFullScreen ? (
     <>

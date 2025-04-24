@@ -21,13 +21,21 @@ export const WeekPicker = ({
   const weekStart = startOfWeek(selectedDate);
   const weekEnd = endOfWeek(selectedDate);
 
-  // Create the marked dates object for the calendar
-  const markedDates = {
+  // Create the marked dates object for the calendar with proper types
+  const markedDates: {
+    [date: string]: {
+      startingDay?: boolean;
+      endingDay?: boolean;
+      color: string;
+    };
+  } = {
     [format(weekStart, "yyyy-MM-dd")]: {
       startingDay: true,
+      endingDay: false,
       color: "#FAE395",
     },
     [format(weekEnd, "yyyy-MM-dd")]: {
+      startingDay: false,
       endingDay: true,
       color: "#FAE395",
     },
@@ -38,6 +46,8 @@ export const WeekPicker = ({
   while (format(currentDate, "yyyy-MM-dd") !== format(weekEnd, "yyyy-MM-dd")) {
     currentDate.setDate(currentDate.getDate() + 1);
     markedDates[format(currentDate, "yyyy-MM-dd")] = {
+      startingDay: false,
+      endingDay: false,
       color: "#FAE395",
     };
   }
@@ -60,7 +70,7 @@ export const WeekPicker = ({
 
           <Calendar
             current={format(selectedDate, "yyyy-MM-dd")}
-            onDayPress={(day) => {
+            onDayPress={(day: any) => {
               onSelectWeek(new Date(day.timestamp));
               onClose();
             }}

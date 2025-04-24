@@ -44,15 +44,28 @@ export const getCompletionIcon = (
   status: string,
   projectColor: string | undefined
 ): IconInfo => {
-  const color = projectColor || getStatusColor(status);
+  let color = "#808080";
+
+  if (projectColor) {
+    console.log(`[getCompletionIcon] Using project color: ${projectColor}`);
+    color = projectColor;
+  } else {
+    console.log(`[getCompletionIcon] No project color, using status color`);
+    color = getStatusColor(status);
+  }
+
+  // For cancelled status, always use red
+  if (status === "cancelled") {
+    color = "#F44336";
+  }
 
   switch (status) {
     case "completed":
       return { name: "check-circle", size: 18, color };
     case "cancelled":
-      return { name: "times-circle", size: 18, color: "#F44336" };
+      return { name: "times-circle", size: 18, color };
     default:
-      return { name: "circle-thin", size: 18, color: color || "#BBBBBB" };
+      return { name: "circle-thin", size: 18, color };
   }
 };
 
