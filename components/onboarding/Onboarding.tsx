@@ -10,6 +10,7 @@ import TimerSetupScreen from "./TimerSetupScreen";
 import StartSessionScreen from "./StartSessionScreen";
 import TrialScreen from "./TrialScreen";
 import LoginScreen from "./LoginScreen";
+import DailyGoalScreen from "./DailyGoalScreen";
 import { useRouter } from "expo-router";
 
 export default function Onboarding() {
@@ -38,10 +39,8 @@ export default function Onboarding() {
             />
           );
         } else if (currentScreen.id === "setup3") {
-          // Use the standard OnboardingScreen for setup3
-          console.log("[Onboarding] Rendering setup3 screen");
           return (
-            <OnboardingScreen
+            <DailyGoalScreen
               screen={currentScreen}
               currentStep={currentScreenIndex}
               totalSteps={totalScreens}
