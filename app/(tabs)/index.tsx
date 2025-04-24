@@ -607,7 +607,7 @@ export default function TimerScreen() {
 
   if (!session)
     return (
-      <View className="w-full mt-32">
+      <View className="w-full">
         <SupabaseLogin isOnboardingFlow={false} />
       </View>
     );
