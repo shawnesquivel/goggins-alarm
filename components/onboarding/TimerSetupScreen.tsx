@@ -59,7 +59,7 @@ export default function TimerSetupScreen({
   };
 
   const incrementBreak = () => {
-    setBreakDuration((prev) => Math.min(prev + 5, 30));
+    setBreakDuration((prev) => Math.min(prev + 5, 60));
   };
 
   const decrementBreak = () => {
@@ -96,7 +96,7 @@ export default function TimerSetupScreen({
     if (!isNaN(value)) {
       // Only apply min/max when the input is complete (reached max length)
       if (text.length === 2) {
-        setBreakDuration(Math.min(Math.max(value, 5), 30));
+        setBreakDuration(Math.min(Math.max(value, 5), 60));
       } else {
         // Allow any number while typing
         setBreakDuration(value);
