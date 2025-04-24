@@ -14,6 +14,9 @@ import {
   useFonts,
   LibreCaslonText_400Regular,
 } from "@expo-google-fonts/libre-caslon-text";
+import { usePomodoro } from "@/contexts/AlarmContext";
+import { useRouter } from "expo-router";
+import { useOnboarding } from "@/contexts/OnboardingContext";
 
 interface DailyGoalScreenProps {
   screen: OnboardingScreenType;
@@ -32,10 +35,55 @@ export default function DailyGoalScreen({
   onNext,
   onBack,
 }: DailyGoalScreenProps) {
+  const { settings, updateSettings } = usePomodoro();
   const [dailyGoal, setDailyGoal] = useState(30); // Default 30 minutes
+  const router = useRouter();
+  const { completeOnboarding } = useOnboarding();
+  const [isNavigating, setIsNavigating] = useState(false);
   const [fontsLoaded] = useFonts({
     LibreCaslonText_400Regular,
   });
+
+  const handleUpdateSettings = async () => {
+    if (!isNavigating) {
+      setIsNavigating(true);
+      try {
+        // Update settings first
+        updateSettings({
+          ...settings,
+          dailyGoal,
+        });
+
+        // Mark onboarding as complete
+        await completeOnboarding();
+        console.log("[DailyGoalScreen] Onboarding marked as complete");
+
+        // Navigate to tabs screen with a delay to ensure state updates complete
+        setTimeout(() => {
+          console.log("[DailyGoalScreen] Navigating to tabs screen");
+          try {
+            router.replace("/(tabs)");
+          } catch (navError) {
+            console.error("[DailyGoalScreen] Navigation failed:", navError);
+            // Fallback navigation attempt
+            setTimeout(() => {
+              console.log("[DailyGoalScreen] Attempting fallback navigation");
+              router.push("/(tabs)");
+            }, 500);
+          }
+        }, 1000);
+      } catch (error) {
+        console.error("[DailyGoalScreen] Settings update error:", error);
+        setIsNavigating(false);
+
+        // Try to navigate anyway as a fallback
+        setTimeout(() => {
+          console.log("[DailyGoalScreen] Fallback navigation after error");
+          router.replace("/");
+        }, 1000);
+      }
+    }
+  };
 
   const handleUpdateGoal = () => {
     // TODO: Save the daily goal to your app's state/context
@@ -91,7 +139,7 @@ export default function DailyGoalScreen({
         screen={screen}
         currentStep={currentStep}
         totalSteps={totalSteps}
-        onNext={handleUpdateGoal}
+        onNext={handleUpdateSettings}
         onBack={onBack}
       >
         <View className="flex-1 justify-center items-center pt-10">

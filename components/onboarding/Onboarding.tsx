@@ -44,7 +44,12 @@ export default function Onboarding() {
               screen={currentScreen}
               currentStep={currentScreenIndex}
               totalSteps={totalScreens}
-              onNext={nextScreen}
+              onNext={() => {
+                // Don't do any navigation here - it's handled in the DailyGoalScreen component
+                console.log(
+                  "[Onboarding] Daily goal setup complete - navigation handled in component"
+                );
+              }}
               onBack={previousScreen}
             />
           );

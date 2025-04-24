@@ -72,6 +72,7 @@ interface PomodoroContextType {
 const DEFAULT_SETTINGS: TimerSettings = {
   focusDuration: 25,
   breakDuration: 5,
+  dailyGoal: 30,
   soundEnabled: true,
   notificationsEnabled: true,
 };

@@ -97,12 +97,6 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
     description:
       "We highly recommend starting at 30-60min per day.\n\nYou can change any time.",
   },
-  {
-    id: "start",
-    type: OnboardingScreenType.START,
-    title: "Begin with *intention*.",
-    description: "Let's get started with your first focus session.",
-  },
 ];
 
 // Storage key
