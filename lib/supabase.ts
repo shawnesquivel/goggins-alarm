@@ -8,8 +8,9 @@ export function getSupabaseKeys() {
   /**
    * Fetch the keys from app.config
    */
-  const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl;
-  const supabaseAnonKey = Constants.expoConfig?.extra?.supabaseAnonKey;
+  const supabaseUrl = "https://jsgqekncltjwfjggntvx.supabase.co";
+  const supabaseAnonKey =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzZ3Fla25jbHRqd2ZqZ2dudHZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2NzQ0NTYsImV4cCI6MjA1OTI1MDQ1Nn0.xlf0cZzkJwzRpWFvTGbK55EiiJKEWuztlec7Y2_Xwkw";
 
   if (!supabaseUrl || !supabaseAnonKey) {
     if (__DEV__) {

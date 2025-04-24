@@ -7,19 +7,14 @@ export default {
     scheme: "app.deeptimer.focus",
     extra: {
       openaiApiKey: process.env.OPENAI_API_KEY,
-      supabaseUrl:
-        process.env.SUPABASE_URL_PROD || "App.config.ts couldn't find dev key",
+      supabaseUrl: "https://jsgqekncltjwfjggntvx.supabase.co",
       supabaseAnonKey:
-        process.env.SUPABASE_ANON_KEY_PROD ||
-        "App.config.ts couldn't find anon key",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzZ3Fla25jbHRqd2ZqZ2dudHZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDM2NzQ0NTYsImV4cCI6MjA1OTI1MDQ1Nn0.xlf0cZzkJwzRpWFvTGbK55EiiJKEWuztlec7Y2_Xwkw",
       eas: {
         projectId: "12494e3e-61d2-4a19-8dc6-614b139b45fa",
       },
     },
     plugins: ["expo-font", "expo-router"],
-    android: {
-      package: "app.deeptimer.focus",
-    },
     ios: {
       bundleIdentifier: "app.deeptimer.focus",
       infoPlist: {
@@ -30,6 +25,9 @@ export default {
         ],
         ITSAppUsesNonExemptEncryption: false,
       },
+    },
+    android: {
+      package: "app.deeptimer.focus",
     },
   },
 };
