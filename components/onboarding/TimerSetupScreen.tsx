@@ -143,6 +143,11 @@ export default function TimerSetupScreen({
                     selectTextOnFocus
                   />
                   <Text style={styles.timeUnit}>MINUTES</Text>
+                  {focusDuration >= 60 && (
+                    <Text style={styles.hoursText}>
+                      ({(focusDuration / 60).toFixed(1)} hrs)
+                    </Text>
+                  )}
                 </View>
 
                 <TouchableOpacity
@@ -261,5 +266,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#505050",
     marginTop: 4,
+  },
+  hoursText: {
+    fontSize: 14,
+    color: "#505050",
+    marginTop: 2,
   },
 });
