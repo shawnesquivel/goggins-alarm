@@ -5,8 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   Modal,
-  TouchableWithoutFeedback,
-  Keyboard,
   ScrollView,
   Animated,
   Dimensions,
@@ -65,6 +63,7 @@ export default function EditProjectModal({
 
   useEffect(() => {
     if (visible) {
+      console.log("[EditProjectModal] Modal becoming visible");
       // Reset animation values
       fadeAnim.setValue(0);
       slideAnim.setValue(height);
@@ -100,13 +99,26 @@ export default function EditProjectModal({
     }
   }, [project]);
 
+  const handleNameChange = (text: string) => {
+    setName(text);
+  };
+
+  const handleGoalChange = (text: string) => {
+    setGoal(text);
+  };
+
   const handleSave = () => {
     if (!name.trim()) return;
+    console.log("[EditProjectModal] Saving project:", {
+      name,
+      goal,
+      selectedColor,
+    });
     onSave(name.trim(), goal.trim(), selectedColor);
-    handleClose();
   };
 
   const handleClose = () => {
+    console.log("[EditProjectModal] Closing modal");
     // Start closing animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -127,114 +139,113 @@ export default function EditProjectModal({
 
   return (
     <Modal visible={visible} transparent animationType="none">
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View className="flex-1">
-          {/* Animated Background */}
-          <Animated.View
-            className="absolute inset-0 bg-black"
-            style={{ opacity: fadeAnim }}
-          />
+      <View className="flex-1 relative">
+        {/* Animated Background */}
+        <Animated.View
+          className="absolute inset-0 bg-black z-10"
+          style={{ opacity: fadeAnim }}
+        />
 
-          {/* Animated Modal Content */}
-          <Animated.View
-            className="flex-1 justify-end"
-            style={{ transform: [{ translateY: slideAnim }] }}
-          >
-            <View className="bg-white rounded-t-3xl p-6 max-h-[90%]">
-              {/* Header */}
-              <View className="flex-row justify-center items-center mb-6 relative">
-                {mode === "edit" && (
-                  <TouchableOpacity
-                    onPress={onDelete}
-                    className="absolute -left-2.5 -top-2.5 w-11 h-11 justify-center items-center"
-                  >
-                    <DeleteIcon />
-                  </TouchableOpacity>
-                )}
-                <Text className="text-base font-semibold text-black">
-                  {mode === "add" ? "ADD PROJECT" : "EDIT PROJECT"}
-                </Text>
+        {/* Animated Modal Content */}
+        <Animated.View
+          className="flex-1 justify-end z-20"
+          style={{ transform: [{ translateY: slideAnim }] }}
+        >
+          <View className="bg-white rounded-t-3xl p-6 max-h-[90%] z-30">
+            {/* Header */}
+            <View className="flex-row justify-center items-center mb-6 relative">
+              {mode === "edit" && (
                 <TouchableOpacity
-                  onPress={handleClose}
-                  className="w-11 h-11 justify-center items-center absolute -right-2.5 -top-2.5"
+                  onPress={onDelete}
+                  className="absolute -left-2.5 -top-2.5 w-11 h-11 justify-center items-center z-40"
                 >
-                  <Text className="text-xl text-black">×</Text>
+                  <DeleteIcon />
                 </TouchableOpacity>
-              </View>
-
-              {/* Form */}
-              <ScrollView keyboardShouldPersistTaps="handled">
-                <View>
-                  {/* Project Name */}
-                  <View className="mb-6">
-                    <Text className="text-sm font-semibold mb-2 text-black">
-                      Project Name
-                    </Text>
-                    <TextInput
-                      className="w-full px-4 py-3 rounded border border-[#DDDAD0] text-base text-black"
-                      placeholder="Project name"
-                      value={name}
-                      onChangeText={setName}
-                      placeholderTextColor="#999"
-                    />
-                  </View>
-
-                  {/* Project Goal */}
-                  <View className="mb-6">
-                    <Text className="text-sm font-semibold mb-2 text-black">
-                      Project Goal
-                    </Text>
-                    <TextInput
-                      className="w-full h-24 px-4 py-3 rounded border border-[#DDDAD0] text-base text-black"
-                      placeholder="Describe your big goal for this project"
-                      value={goal}
-                      onChangeText={setGoal}
-                      multiline
-                      placeholderTextColor="#999"
-                      textAlignVertical="top"
-                    />
-                  </View>
-
-                  {/* Color Selection */}
-                  <View className="mb-6">
-                    <Text className="text-sm font-semibold mb-2 text-black">
-                      Color
-                    </Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      className="py-2"
-                    >
-                      {colors.map((color) => (
-                        <TouchableOpacity
-                          key={color}
-                          onPress={() => setSelectedColor(color)}
-                          className={`w-10 h-10 rounded-full mr-3 ${
-                            selectedColor === color
-                              ? "border-2 border-black"
-                              : ""
-                          }`}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </ScrollView>
-                  </View>
-                </View>
-              </ScrollView>
-
-              {/* Save Button */}
+              )}
+              <Text className="text-base font-semibold text-black">
+                {mode === "add" ? "ADD PROJECT" : "EDIT PROJECT"}
+              </Text>
               <TouchableOpacity
-                onPress={handleSave}
-                className="bg-black py-4 rounded-lg items-center mt-6"
+                onPress={handleClose}
+                className="absolute -right-2.5 -top-2.5 w-11 h-11 justify-center items-center z-40"
               >
-                <Text className="text-white text-base font-semibold">
-                  {mode === "add" ? "Add Project" : "Save Changes"}
-                </Text>
+                <Text className="text-2xl text-black">×</Text>
               </TouchableOpacity>
             </View>
-          </Animated.View>
-        </View>
-      </TouchableWithoutFeedback>
+
+            {/* Form */}
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: 20 }}
+            >
+              <View>
+                {/* Project Name */}
+                <View className="mb-6">
+                  <Text className="text-sm font-semibold mb-2 text-black">
+                    Project Name
+                  </Text>
+                  <TextInput
+                    className="w-full px-4 py-3 rounded-lg border border-[#DDDAD0] text-base text-black"
+                    placeholder="Project name"
+                    value={name}
+                    onChangeText={handleNameChange}
+                    placeholderTextColor="#999"
+                  />
+                </View>
+
+                {/* Project Goal */}
+                <View className="mb-6">
+                  <Text className="text-sm font-semibold mb-2 text-black">
+                    Project Goal
+                  </Text>
+                  <TextInput
+                    className="w-full h-24 px-4 py-3 rounded-lg border border-[#DDDAD0] text-base text-black"
+                    placeholder="Describe your big goal for this project"
+                    value={goal}
+                    onChangeText={handleGoalChange}
+                    multiline
+                    placeholderTextColor="#999"
+                    textAlignVertical="top"
+                  />
+                </View>
+
+                {/* Color Selection */}
+                <View className="mb-6">
+                  <Text className="text-sm font-semibold mb-2 text-black">
+                    Color
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    className="py-2"
+                  >
+                    {colors.map((color) => (
+                      <TouchableOpacity
+                        key={color}
+                        onPress={() => setSelectedColor(color)}
+                        className={`w-10 h-10 rounded-full mr-3 ${
+                          selectedColor === color ? "border-2 border-black" : ""
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Save Button */}
+            <TouchableOpacity
+              onPress={handleSave}
+              className="bg-black py-4 rounded-lg items-center mt-6"
+            >
+              <Text className="text-white text-base font-semibold">
+                {mode === "add" ? "Add Project" : "Save Changes"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }

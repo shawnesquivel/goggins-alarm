@@ -13,8 +13,10 @@ import { useColorScheme } from "@/components/useColorScheme";
 import { PomodoroProvider } from "@/contexts/AlarmContext";
 import { OnboardingProvider } from "@/contexts/OnboardingContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { AccountSetupProvider } from "@/contexts/AccountSetupContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useOnboarding } from "@/contexts/OnboardingContext";
+import { useAccountSetup } from "@/contexts/AccountSetupContext";
 import { View, Text, ActivityIndicator } from "react-native";
 import {
   Figtree_400Regular,
@@ -29,6 +31,7 @@ import { ProjectProvider } from "@/contexts/ProjectContext";
 import { checkConnection } from "@/lib/supabase";
 import { MaterialIcons } from "@expo/vector-icons";
 import SupabaseLogin from "@/components/auth/SupabaseLogin";
+import AccountSetupFlow from "@/components/account-setup/AccountSetupFlow";
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -104,25 +107,28 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
-      <OnboardingProvider>
-        <ProjectProvider>
-          <PomodoroProvider>
-            {!isConnected && <OfflineIndicator />}
-            <RootLayoutNav />
-          </PomodoroProvider>
-        </ProjectProvider>
-      </OnboardingProvider>
+      <AccountSetupProvider>
+        <OnboardingProvider>
+          <ProjectProvider>
+            <PomodoroProvider>
+              {!isConnected && <OfflineIndicator />}
+              <RootLayoutNav />
+            </PomodoroProvider>
+          </ProjectProvider>
+        </OnboardingProvider>
+      </AccountSetupProvider>
     </AuthProvider>
   );
 }
 
 function RootLayoutNav() {
-  const { session, isLoading } = useAuth();
+  const { session, isLoading: isAuthLoading } = useAuth();
   const { isOnboarding } = useOnboarding();
+  const { isSetupRequired, isCheckingSetup } = useAccountSetup();
   const colorScheme = useColorScheme();
 
   // Show loading screen while checking auth state
-  if (isLoading) {
+  if (isAuthLoading || isCheckingSetup) {
     return <LoadingScreen />;
   }
 
@@ -133,6 +139,11 @@ function RootLayoutNav() {
         <SupabaseLogin />
       </View>
     );
+  }
+
+  // Show account setup if authenticated but setup is required
+  if (session && isSetupRequired) {
+    return <AccountSetupFlow />;
   }
 
   // Show main app layout if authenticated or in onboarding
