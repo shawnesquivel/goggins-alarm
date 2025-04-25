@@ -8,7 +8,7 @@ import OnboardingScreen from "./OnboardingScreen";
 import ProjectSetupScreen from "./ProjectSetupScreen";
 import TimerSetupScreen from "./TimerSetupScreen";
 import StartSessionScreen from "./StartSessionScreen";
-import TrialScreen from "./TrialScreen";
+// import TrialScreen from "./TrialScreen";
 import LoginScreen from "./LoginScreen";
 import DailyGoalScreen from "./DailyGoalScreen";
 import { useRouter } from "expo-router";
@@ -65,16 +65,18 @@ export default function Onboarding() {
           />
         );
 
-      case OnboardingScreenType.TRIAL:
-        return (
-          <TrialScreen
-            screen={currentScreen}
-            currentStep={currentScreenIndex}
-            totalSteps={totalScreens}
-            onNext={nextScreen}
-            onBack={previousScreen}
-          />
-        );
+      //  TODO: Add Revenue Cat free trials.
+
+      // case OnboardingScreenType.TRIAL:
+      //   return (
+      //     <TrialScreen
+      //       screen={currentScreen}
+      //       currentStep={currentScreenIndex}
+      //       totalSteps={totalScreens}
+      //       onNext={nextScreen}
+      //       onBack={previousScreen}
+      //     />
+      //   );
 
       case OnboardingScreenType.LOGIN:
         return (

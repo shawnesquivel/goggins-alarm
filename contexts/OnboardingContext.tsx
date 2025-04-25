@@ -72,13 +72,13 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
     description:
       "Every day, you'll aim to hit your goal (1-3hrs) and build a streak.\n\nOur AI will track your stats over time, and help unlock your *10X* productivity.",
   },
-  {
-    id: "trial",
-    type: OnboardingScreenType.TRIAL,
-    title: "Start your free trial",
-    description: "Pro Version\n\nAI insights\n\nCreate unlimited projects",
-    action: "Start 30-Day Free Trial",
-  },
+  // {
+  //   id: "trial",
+  //   type: OnboardingScreenType.TRIAL,
+  //   title: "Start your free trial",
+  //   description: "Pro Version\n\nAI insights\n\nCreate unlimited projects",
+  //   action: "Start 30-Day Free Trial",
+  // },
   {
     id: "login",
     type: OnboardingScreenType.LOGIN,
