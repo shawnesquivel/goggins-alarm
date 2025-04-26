@@ -95,6 +95,12 @@ export interface SessionServiceInterface {
   completeSessionLifecycle(sessionId: string): Promise<boolean>;
   setupBackgroundSync(intervalMinutes?: number): Promise<void>;
   completeSession(sessionId: string, taskCompleted: boolean): Promise<boolean>;
+
+  // Add these new storage key helper methods
+  _getStorageKey(baseKey: string): Promise<string>;
+  _getCurrentStorageKey(baseKey: string): Promise<string>;
+  _getDeviceId(): Promise<string>;
+  clearUserData(userId?: string | null): Promise<void>;
 }
 
 export interface SessionSection {

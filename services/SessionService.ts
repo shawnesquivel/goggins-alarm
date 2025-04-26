@@ -12,6 +12,7 @@ import {
   SESSION_STORAGE_KEYS,
   SessionServiceInterface,
 } from "@/types/session";
+import { AuthService } from "@/services/AuthService";
 
 export const SessionService: SessionServiceInterface = {
   /**
@@ -34,10 +35,10 @@ export const SessionService: SessionServiceInterface = {
     // Save locally first
     const sessions = await this.getSessions();
     sessions.push(session);
-    await AsyncStorage.setItem(
-      SESSION_STORAGE_KEYS.SESSIONS,
-      JSON.stringify(sessions)
+    const sessionsKey = await this._getStorageKey(
+      SESSION_STORAGE_KEYS.SESSIONS
     );
+    await AsyncStorage.setItem(sessionsKey, JSON.stringify(sessions));
 
     // Save as current session
     await this.setCurrentSession(session);
@@ -79,10 +80,10 @@ export const SessionService: SessionServiceInterface = {
     const updatedSessions = sessions.map((s) =>
       s.id === sessionId ? updatedSession : s
     );
-    await AsyncStorage.setItem(
-      SESSION_STORAGE_KEYS.SESSIONS,
-      JSON.stringify(updatedSessions)
+    const sessionsKey = await this._getStorageKey(
+      SESSION_STORAGE_KEYS.SESSIONS
     );
+    await AsyncStorage.setItem(sessionsKey, JSON.stringify(updatedSessions));
 
     // If this is the current session, update it
     const currentSession = await this.getCurrentSession();
@@ -122,11 +123,11 @@ export const SessionService: SessionServiceInterface = {
    */
   async getSessions(): Promise<DbSession[]> {
     try {
-      const storedSessions = await AsyncStorage.getItem(
+      const sessionsKey = await this._getStorageKey(
         SESSION_STORAGE_KEYS.SESSIONS
       );
-      const sessions = storedSessions ? JSON.parse(storedSessions) : [];
-      return sessions;
+      const storedSessions = await AsyncStorage.getItem(sessionsKey);
+      return storedSessions ? JSON.parse(storedSessions) : [];
     } catch (error) {
       console.error("Error loading sessions from local storage:", error);
       return [];
@@ -162,10 +163,8 @@ export const SessionService: SessionServiceInterface = {
     // Save locally
     const periods = await this.getLocalPeriods();
     periods.push(period);
-    await AsyncStorage.setItem(
-      SESSION_STORAGE_KEYS.PERIODS,
-      JSON.stringify(periods)
-    );
+    const periodsKey = await this._getStorageKey(SESSION_STORAGE_KEYS.PERIODS);
+    await AsyncStorage.setItem(periodsKey, JSON.stringify(periods));
 
     // Set as current period
     await this.setCurrentPeriod(period);
@@ -219,10 +218,8 @@ export const SessionService: SessionServiceInterface = {
     const updatedPeriods = periods.map((p) =>
       p.id === periodId ? updatedPeriod : p
     );
-    await AsyncStorage.setItem(
-      SESSION_STORAGE_KEYS.PERIODS,
-      JSON.stringify(updatedPeriods)
-    );
+    const periodsKey = await this._getStorageKey(SESSION_STORAGE_KEYS.PERIODS);
+    await AsyncStorage.setItem(periodsKey, JSON.stringify(updatedPeriods));
 
     // If this is the current period, update it
     const currentPeriod = await this.getCurrentPeriod();
@@ -283,9 +280,10 @@ export const SessionService: SessionServiceInterface = {
    */
   async getLocalPeriods(): Promise<DbPeriod[]> {
     try {
-      const storedPeriods = await AsyncStorage.getItem(
+      const periodsKey = await this._getStorageKey(
         SESSION_STORAGE_KEYS.PERIODS
       );
+      const storedPeriods = await AsyncStorage.getItem(periodsKey);
       return storedPeriods ? JSON.parse(storedPeriods) : [];
     } catch (error) {
       console.error("Error loading periods from local storage:", error);
@@ -332,10 +330,10 @@ export const SessionService: SessionServiceInterface = {
     }
 
     if (updated) {
-      await AsyncStorage.setItem(
-        SESSION_STORAGE_KEYS.PERIODS,
-        JSON.stringify(periods)
+      const periodsKey = await this._getStorageKey(
+        SESSION_STORAGE_KEYS.PERIODS
       );
+      await AsyncStorage.setItem(periodsKey, JSON.stringify(periods));
     }
   },
 
@@ -345,9 +343,10 @@ export const SessionService: SessionServiceInterface = {
    */
   async getCurrentSession(): Promise<DbSession | null> {
     try {
-      const currentSession = await AsyncStorage.getItem(
+      const currentKey = await this._getCurrentStorageKey(
         SESSION_STORAGE_KEYS.CURRENT_SESSION
       );
+      const currentSession = await AsyncStorage.getItem(currentKey);
       return currentSession ? JSON.parse(currentSession) : null;
     } catch (error) {
       console.error("Error loading current session from local storage:", error);
@@ -361,9 +360,10 @@ export const SessionService: SessionServiceInterface = {
    */
   async getCurrentPeriod(): Promise<DbPeriod | null> {
     try {
-      const currentPeriod = await AsyncStorage.getItem(
+      const currentKey = await this._getCurrentStorageKey(
         SESSION_STORAGE_KEYS.CURRENT_PERIOD
       );
+      const currentPeriod = await AsyncStorage.getItem(currentKey);
       return currentPeriod ? JSON.parse(currentPeriod) : null;
     } catch (error) {
       console.error("Error loading current period from local storage:", error);
@@ -376,13 +376,13 @@ export const SessionService: SessionServiceInterface = {
    * Local-only: Does not interact with Supabase.
    */
   async setCurrentSession(session: DbSession | null): Promise<void> {
+    const currentKey = await this._getCurrentStorageKey(
+      SESSION_STORAGE_KEYS.CURRENT_SESSION
+    );
     if (session) {
-      await AsyncStorage.setItem(
-        SESSION_STORAGE_KEYS.CURRENT_SESSION,
-        JSON.stringify(session)
-      );
+      await AsyncStorage.setItem(currentKey, JSON.stringify(session));
     } else {
-      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_SESSION);
+      await AsyncStorage.removeItem(currentKey);
     }
   },
 
@@ -391,13 +391,13 @@ export const SessionService: SessionServiceInterface = {
    * Local-only: Does not interact with Supabase.
    */
   async setCurrentPeriod(period: DbPeriod | null): Promise<void> {
+    const currentKey = await this._getCurrentStorageKey(
+      SESSION_STORAGE_KEYS.CURRENT_PERIOD
+    );
     if (period) {
-      await AsyncStorage.setItem(
-        SESSION_STORAGE_KEYS.CURRENT_PERIOD,
-        JSON.stringify(period)
-      );
+      await AsyncStorage.setItem(currentKey, JSON.stringify(period));
     } else {
-      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_PERIOD);
+      await AsyncStorage.removeItem(currentKey);
     }
   },
 
@@ -504,9 +504,10 @@ export const SessionService: SessionServiceInterface = {
    */
   async getPendingOperations(): Promise<SessionPendingOperation[]> {
     try {
-      const pendingOps = await AsyncStorage.getItem(
+      const pendingKey = await this._getStorageKey(
         SESSION_STORAGE_KEYS.PENDING_OPS
       );
+      const pendingOps = await AsyncStorage.getItem(pendingKey);
       return pendingOps ? JSON.parse(pendingOps) : [];
     } catch (error) {
       console.error(
@@ -525,15 +526,15 @@ export const SessionService: SessionServiceInterface = {
     operation: Omit<SessionPendingOperation, "id">
   ): Promise<void> {
     try {
+      const pendingKey = await this._getStorageKey(
+        SESSION_STORAGE_KEYS.PENDING_OPS
+      );
       const pendingOps = await this.getPendingOperations();
       pendingOps.push({
         ...operation,
         id: uuidv4(),
       });
-      await AsyncStorage.setItem(
-        SESSION_STORAGE_KEYS.PENDING_OPS,
-        JSON.stringify(pendingOps)
-      );
+      await AsyncStorage.setItem(pendingKey, JSON.stringify(pendingOps));
     } catch (error) {
       console.error("Error adding pending operation:", error);
     }
@@ -547,10 +548,10 @@ export const SessionService: SessionServiceInterface = {
     try {
       const pendingOps = await this.getPendingOperations();
       const updatedOps = pendingOps.filter((op) => op.id !== operationId);
-      await AsyncStorage.setItem(
-        SESSION_STORAGE_KEYS.PENDING_OPS,
-        JSON.stringify(updatedOps)
+      const pendingKey = await this._getStorageKey(
+        SESSION_STORAGE_KEYS.PENDING_OPS
       );
+      await AsyncStorage.setItem(pendingKey, JSON.stringify(updatedOps));
     } catch (error) {
       console.error("Error removing pending operation:", error);
     }
@@ -615,8 +616,6 @@ export const SessionService: SessionServiceInterface = {
       // Clear session state regardless of sync result
       await this.setCurrentSession(null);
       await this.setCurrentPeriod(null);
-      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_SESSION);
-      await AsyncStorage.removeItem(SESSION_STORAGE_KEYS.CURRENT_PERIOD);
 
       return syncSuccessful;
     } catch (error) {
@@ -667,6 +666,87 @@ export const SessionService: SessionServiceInterface = {
     } catch (error) {
       console.error("Error in completeSession:", error);
       return false;
+    }
+  },
+
+  /**
+   * Gets the storage key for a specific base key with user namespacing
+   * @param baseKey - The base storage key
+   * @returns Storage key with user prefix, e.g. "user_{id}_sessions" or "anonymous_sessions"
+   */
+  async _getStorageKey(baseKey: string): Promise<string> {
+    const userId = await AuthService.getCurrentUserId();
+    return userId ? `user_${userId}_${baseKey}` : `anonymous_${baseKey}`;
+  },
+
+  /**
+   * Gets the device-specific storage key for current session/period
+   * @param baseKey - The base storage key
+   * @returns Device-specific storage key with user prefix
+   */
+  async _getCurrentStorageKey(baseKey: string): Promise<string> {
+    const deviceId = await this._getDeviceId();
+    const userId = await AuthService.getCurrentUserId();
+    const prefix = userId ? `user_${userId}` : "anonymous";
+    return `${prefix}_device_${deviceId}_${baseKey}`;
+  },
+
+  /**
+   * Gets or generates a device ID for isolation
+   * @returns Device ID string
+   */
+  async _getDeviceId(): Promise<string> {
+    let deviceId = await AsyncStorage.getItem("device_id");
+    if (!deviceId) {
+      deviceId = uuidv4();
+      await AsyncStorage.setItem("device_id", deviceId);
+    }
+    return deviceId;
+  },
+
+  /**
+   * Clears all user-specific data from storage
+   * @param userId - User ID to clear data for
+   */
+  async clearUserData(userId?: string | null): Promise<void> {
+    try {
+      // If userId not provided, get the current user
+      if (userId === undefined) {
+        userId = await AuthService.getCurrentUserId();
+      }
+
+      if (userId) {
+        console.log(`[SessionService] Clearing data for user: ${userId}`);
+
+        // Get keys that might need clearing
+        const keys = await AsyncStorage.getAllKeys();
+        const userKeys = keys.filter((key) =>
+          key.startsWith(`user_${userId}_`)
+        );
+
+        // Remove all user-specific keys
+        if (userKeys.length > 0) {
+          await AsyncStorage.multiRemove(userKeys);
+        }
+
+        console.log(
+          `[SessionService] Cleared ${userKeys.length} keys for user ${userId}`
+        );
+      } else {
+        console.log(
+          `[SessionService] No user ID available, clearing anonymous data`
+        );
+        const keys = await AsyncStorage.getAllKeys();
+        const anonymousKeys = keys.filter((key) =>
+          key.startsWith("anonymous_")
+        );
+
+        if (anonymousKeys.length > 0) {
+          await AsyncStorage.multiRemove(anonymousKeys);
+        }
+      }
+    } catch (error) {
+      console.error("[SessionService] Error clearing user data:", error);
     }
   },
 };
