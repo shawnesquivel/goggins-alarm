@@ -4,42 +4,93 @@ import { Project } from "@/types/project";
 import { AppState } from "react-native";
 import "react-native-get-random-values";
 import { v4 as uuidv4 } from "uuid";
+import { AuthService } from "@/services/AuthService";
 
-// Storage keys
+/**
+ * Storage keys used for persisting data in AsyncStorage
+ */
 const STORAGE_KEYS = {
   PROJECTS: "offline_projects",
   PENDING_OPS: "pending_projects_operations",
   OFFLINE_MODE: "offline_mode",
 };
 
-// Define pending operation types
+/**
+ * Types of operations that can be queued for syncing
+ */
 type OperationType = "insert" | "update" | "delete";
 
+/**
+ * Represents a pending operation to be synced with the remote database
+ */
 export interface PendingOperation {
   type: OperationType;
   data: Project;
   timestamp: number;
 }
 
+/**
+ * Gets the storage key for projects specific to the current user
+ * @returns Storage key in format "user_{id}_projects" or "anonymous_projects"
+ */
+async function getUserProjectsKey() {
+  const userId = await AuthService.getCurrentUserId();
+  const key = userId ? `user_${userId}_projects` : "anonymous_projects";
+  console.log(`[ProjectService] Using projects storage key: ${key}`);
+  return key;
+}
+
+/**
+ * Gets the storage key for pending operations specific to the current user
+ * @returns Storage key in format "user_{id}_pending_ops" or "anonymous_pending_ops"
+ */
+async function getUserPendingOpsKey() {
+  const userId = await AuthService.getCurrentUserId();
+  const key = userId ? `user_${userId}_pending_ops` : "anonymous_pending_ops";
+  console.log(`[ProjectService] Using pending ops storage key: ${key}`);
+  return key;
+}
+
+/**
+ * Service for managing projects with offline-first capabilities.
+ *
+ * This service implements an offline-first architecture where:
+ * - All operations are performed on local storage first
+ * - Changes are queued as pending operations when offline
+ * - Sync occurs automatically when the app regains connectivity
+ * - Each user has their own isolated storage space
+ * - Fallback to offline mode on sync failures
+ */
 export const ProjectService = {
   isOfflineMode: false,
+  appStateSubscription: null as { remove: () => void } | null,
 
+  /**
+   * Enables or disables offline mode
+   * @param enabled - Whether to enable offline mode
+   */
   async setOfflineMode(enabled: boolean) {
     this.isOfflineMode = enabled;
     await AsyncStorage.setItem(
       STORAGE_KEYS.OFFLINE_MODE,
       JSON.stringify(enabled)
     );
-    console.log(`Offline mode ${enabled ? "enabled" : "disabled"}`);
+    console.log(
+      `[ProjectService] Offline mode ${enabled ? "enabled" : "disabled"}`
+    );
   },
 
+  /**
+   * Checks if offline mode is currently enabled
+   * @returns Current offline mode state
+   */
   async checkOfflineMode() {
     try {
       const offlineMode = await AsyncStorage.getItem(STORAGE_KEYS.OFFLINE_MODE);
       this.isOfflineMode = offlineMode === "true";
       return this.isOfflineMode;
     } catch (error) {
-      console.error("Error checking offline mode:", error);
+      console.error("[ProjectService] Error checking offline mode:", error);
       return false;
     }
   },
@@ -48,29 +99,54 @@ export const ProjectService = {
    * Local Storage Methods
    */
 
-  // Get projects from local storage
+  /**
+   * Retrieves all projects from local storage for the current user
+   * @returns Array of projects with normalized dates
+   */
   async getLocalProjects(): Promise<Project[]> {
     try {
-      const storedProjects = await AsyncStorage.getItem(STORAGE_KEYS.PROJECTS);
+      console.log("[ProjectService] Getting local projects");
+      const storageKey = await getUserProjectsKey();
+      const storedProjects = await AsyncStorage.getItem(storageKey);
+      console.log(
+        `[ProjectService] Retrieved from ${storageKey}: ${
+          storedProjects ? "data found" : "no data"
+        }`
+      );
+
       const projects = storedProjects ? JSON.parse(storedProjects) : [];
 
       // Normalize all project dates
+      console.log(`[ProjectService] Loaded ${projects.length} local projects`);
       return projects.map(this.normalizeProjectDates);
     } catch (error) {
-      console.error("Error loading projects from local storage:", error);
+      console.error(
+        "[ProjectService] Error loading projects from local storage:",
+        error
+      );
       return [];
     }
   },
 
-  // Save projects to local storage
+  /**
+   * Saves projects to local storage for the current user
+   * @param projects - Array of projects to save
+   */
   async saveLocalProjects(projects: Project[]): Promise<void> {
     try {
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.PROJECTS,
-        JSON.stringify(projects)
+      console.log(
+        `[ProjectService] Saving ${projects.length} projects to local storage`
+      );
+      const storageKey = await getUserProjectsKey();
+      await AsyncStorage.setItem(storageKey, JSON.stringify(projects));
+      console.log(
+        `[ProjectService] Projects saved successfully to ${storageKey}`
       );
     } catch (error) {
-      console.error("Error saving projects to local storage:", error);
+      console.error(
+        "[ProjectService] Error saving projects to local storage:",
+        error
+      );
     }
   },
 
@@ -78,7 +154,10 @@ export const ProjectService = {
    * Supabase Database Methods
    */
 
-  // Fetch projects from Supabase
+  /**
+   * Fetches projects from Supabase for the authenticated user
+   * @returns Array of projects or null if fetch fails
+   */
   async getProjectsFromDB(): Promise<Project[] | null> {
     try {
       const { data, error } = await supabase
@@ -112,7 +191,15 @@ export const ProjectService = {
    * CRUD Operations
    */
 
-  // Create a new project
+  /**
+   * Creates a new project with offline-first approach:
+   * 1. Saves to local storage immediately
+   * 2. If online, attempts to sync with Supabase
+   * 3. If offline/sync fails, queues for later sync
+   *
+   * @param projectData - Project data without id/timestamps
+   * @returns Newly created project
+   */
   async createProject(
     projectData: Omit<Project, "id" | "createdAt" | "updatedAt">
   ): Promise<Project> {
@@ -196,7 +283,15 @@ export const ProjectService = {
     return newProject;
   },
 
-  // Update an existing project
+  /**
+   * Updates an existing project with offline-first approach:
+   * 1. Updates in local storage immediately
+   * 2. If online, attempts to sync with Supabase
+   * 3. If offline/sync fails, queues for later sync
+   *
+   * @param projectData - Complete project data to update
+   * @returns Updated project
+   */
   async updateProject(projectData: Project): Promise<Project> {
     const updatedProject = {
       ...projectData,
@@ -263,7 +358,15 @@ export const ProjectService = {
     return updatedProject;
   },
 
-  // Delete a project
+  /**
+   * Deletes a project with offline-first approach:
+   * 1. Deletes from local storage immediately
+   * 2. If online, attempts to sync with Supabase
+   * 3. If offline/sync fails, queues for later sync
+   *
+   * @param projectId - ID of project to delete
+   * @returns Success status of local deletion
+   */
   async deleteProject(projectId: string): Promise<boolean> {
     // Get the project before deletion for the pending operations queue if needed
     const localProjects = await this.getLocalProjects();
@@ -323,40 +426,105 @@ export const ProjectService = {
    * Pending Operations Queue
    */
 
-  // Get pending operations
+  /**
+   * Retrieves all pending operations for the current user
+   * @returns Array of pending operations
+   */
   async getPendingOperations(): Promise<PendingOperation[]> {
     try {
-      const storedOps = await AsyncStorage.getItem(STORAGE_KEYS.PENDING_OPS);
-      return storedOps ? JSON.parse(storedOps) : [];
+      const storageKey = await getUserPendingOpsKey();
+      console.log(
+        `[ProjectService] Getting pending operations from ${storageKey}`
+      );
+      const storedOps = await AsyncStorage.getItem(storageKey);
+      const operations = storedOps ? JSON.parse(storedOps) : [];
+      console.log(
+        `[ProjectService] Found ${operations.length} pending operations`
+      );
+      return operations;
     } catch (error) {
-      console.error("Error loading pending operations:", error);
+      console.error(
+        "[ProjectService] Error loading pending operations:",
+        error
+      );
       return [];
     }
   },
 
-  // Save pending operations
+  /**
+   * Saves pending operations for the current user
+   * @param operations - Array of pending operations to save
+   */
   async savePendingOperations(operations: PendingOperation[]): Promise<void> {
     try {
-      await AsyncStorage.setItem(
-        STORAGE_KEYS.PENDING_OPS,
-        JSON.stringify(operations)
+      const storageKey = await getUserPendingOpsKey();
+      console.log(
+        `[ProjectService] Saving ${operations.length} pending operations to ${storageKey}`
       );
+      await AsyncStorage.setItem(storageKey, JSON.stringify(operations));
+      console.log(`[ProjectService] Pending operations saved successfully`);
     } catch (error) {
-      console.error("Error saving pending operations:", error);
+      console.error("[ProjectService] Error saving pending operations:", error);
     }
   },
 
-  // Add operation to pending queue
+  /**
+   * Adds a new operation to the pending queue
+   * @param operation - Operation to add to queue
+   */
   async addPendingOperation(operation: PendingOperation): Promise<void> {
+    console.log(
+      `[ProjectService] Adding ${operation.type} operation to pending queue`
+    );
     const pendingOps = await this.getPendingOperations();
     await this.savePendingOperations([...pendingOps, operation]);
+  },
+
+  /**
+   * Clears all stored data for a specific user or anonymous data
+   * @param userId - Optional user ID, if not provided uses current user
+   */
+  async clearUserData(userId?: string | null): Promise<void> {
+    try {
+      // If userId not provided, get the current user
+      if (userId === undefined) {
+        userId = await AuthService.getCurrentUserId();
+      }
+
+      if (userId) {
+        console.log(`[ProjectService] Clearing data for user: ${userId}`);
+        // Clear user-specific storage
+        await AsyncStorage.removeItem(`user_${userId}_projects`);
+        await AsyncStorage.removeItem(`user_${userId}_pending_ops`);
+        console.log(
+          `[ProjectService] User data cleared successfully for ${userId}`
+        );
+      } else {
+        console.log(
+          `[ProjectService] No user ID available, clearing anonymous data`
+        );
+        await AsyncStorage.removeItem("anonymous_projects");
+        await AsyncStorage.removeItem("anonymous_pending_ops");
+      }
+    } catch (error) {
+      console.error("[ProjectService] Error clearing user data:", error);
+    }
   },
 
   /**
    * Sync Methods
    */
 
-  // Sync local projects with remote database
+  /**
+   * Synchronizes local projects with remote database:
+   * 1. Processes any pending operations first
+   * 2. Fetches latest remote projects
+   * 3. Updates local storage with remote data
+   *
+   * Falls back to offline mode if sync fails
+   *
+   * @returns Array of synchronized projects
+   */
   async syncProjects(): Promise<Project[]> {
     try {
       // Check offline mode first
@@ -408,7 +576,13 @@ export const ProjectService = {
     }
   },
 
-  // Enhanced processing function with retry logic
+  /**
+   * Processes pending operations with retry logic
+   * Attempts to sync each operation with the remote database
+   * Removes successful operations from the queue
+   *
+   * @param operations - Array of pending operations to process
+   */
   async processPendingOperationsWithRetry(
     operations: PendingOperation[]
   ): Promise<void> {
@@ -532,18 +706,49 @@ export const ProjectService = {
     }
   },
 
-  // Initialize app-level listeners
-  initListeners(): void {
-    // Listen for app state changes to trigger sync
-    AppState.addEventListener("change", (state) => {
+  /**
+   * Initializes app state change listeners to handle sync operations.
+   * When the app becomes active (e.g. returning from background),
+   * this triggers a sync of pending operations with the remote database.
+   *
+   * Offline-first: Any queued operations will be processed when the app regains focus + connectivity.
+   */
+  initListeners(): () => void {
+    console.log("[ProjectService] Initializing AppState listeners");
+
+    // Clean up any existing listener first to prevent duplicates
+    if (this.appStateSubscription) {
+      console.log("[ProjectService] Cleaning up existing AppState listener");
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
+
+    // Create new listener
+    console.log("[ProjectService] Creating new AppState listener");
+    this.appStateSubscription = AppState.addEventListener("change", (state) => {
       if (state === "active") {
-        console.log("App became active, processing pending operations");
+        console.log("[ProjectService] App became active, syncing projects");
         this.syncProjects();
       }
     });
+
+    // Return cleanup function for the context to use
+    return () => {
+      if (this.appStateSubscription) {
+        console.log(
+          "[ProjectService] Cleaning up AppState listener from cleanup function"
+        );
+        this.appStateSubscription.remove();
+        this.appStateSubscription = null;
+      }
+    };
   },
 
-  // Helper function to normalize project data
+  /**
+   * Ensures project dates are proper Date objects
+   * @param project - Project to normalize
+   * @returns Project with normalized dates
+   */
   normalizeProjectDates(project: Project): Project {
     if (project.createdAt && !(project.createdAt instanceof Date)) {
       project.createdAt = new Date(project.createdAt);
@@ -556,7 +761,10 @@ export const ProjectService = {
     return project;
   },
 
-  // Helper function to remove a pending operation
+  /**
+   * Removes a pending operation from the queue
+   * @param operationId - ID of operation to remove
+   */
   async removePendingOperation(operationId: string): Promise<void> {
     const pendingOps = await this.getPendingOperations();
     // Also check for duplicate operations with the same ID
@@ -569,13 +777,17 @@ export const ProjectService = {
     await this.savePendingOperations(updatedOps);
   },
 
-  // Helper function to generate a new UUID
+  /**
+   * Generates a new UUID for project IDs
+   * @returns UUID string
+   */
   generateUUID(): string {
     return uuidv4();
   },
 
   /**
-   * Clean up invalid pending operations that can't be processed
+   * Removes invalid pending operations that can't be processed
+   * @returns Array of valid pending operations
    */
   async cleanupPendingOperations() {
     try {
@@ -607,9 +819,22 @@ export const ProjectService = {
       return [];
     }
   },
+
+  // Add this method to explicitly clean up listeners when needed
+  cleanupListeners() {
+    if (this.appStateSubscription) {
+      console.log("[ProjectService] Explicitly cleaning up AppState listener");
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
+  },
 };
 
-// Helper to check if a string is a valid UUID
+/**
+ * Validates if a string is a valid UUID
+ * @param id - String to validate
+ * @returns Whether string is valid UUID
+ */
 function isValidUUID(id: string | undefined | null): boolean {
   if (!id) return false;
   const uuidRegex =

@@ -150,36 +150,26 @@ export function ProjectProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // Initialize projects
+  // Effect for session-related logic
   useEffect(() => {
+    console.log("[ProjectContext] Initializing with session:", !!session);
     loadProjects();
 
-    // Initialize listeners for sync
-    ProjectService.initListeners();
-
+    // If authenticated, sync with Supabase
     if (session) {
-      // Sync on initial load
       syncProjects();
     }
-  }, []);
+  }, [session]);
 
-  // Add this effect to load pending operations periodically
+  // Effect for listener setup/cleanup (runs once)
   useEffect(() => {
-    const loadPendingOps = async () => {
-      try {
-        const ops = await ProjectService.getPendingOperations();
-        setPendingOps(ops);
-        // Count potential duplicates
-        const insertOps = ops.filter((op) => op.type === "insert");
-        setErrorCount(insertOps.length);
-      } catch (err) {
-        console.error("Error loading pending operations:", err);
-      }
-    };
+    console.log("[ProjectContext] Setting up AppState listeners");
+    const cleanupListeners = ProjectService.initListeners();
 
-    loadPendingOps();
-    const interval = setInterval(loadPendingOps, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      console.log("[ProjectContext] Cleaning up AppState listeners");
+      cleanupListeners();
+    };
   }, []);
 
   return (
