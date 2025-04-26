@@ -150,29 +150,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign out function
   const signOut = async () => {
     try {
-      console.log("[Auth] Signing out user...");
-
-      // Get current user ID before signing out
       const userId = await AuthService.getCurrentUserId();
-      console.log(
-        `[Auth] Current user ID before signout: ${userId || "anonymous"}`
-      );
-
-      // Sign out from Supabase
       const { error } = await supabase.auth.signOut();
-
-      // Clear user-specific project data
       if (userId) {
-        console.log(`[Auth] Clearing project data for user: ${userId}`);
         await ProjectService.clearUserData(userId);
-      } else {
-        console.log("[Auth] No user ID available for data clearing");
       }
 
       if (error) {
         console.error("[Auth] Error signing out:", error);
       } else {
-        console.log("[Auth] User signed out successfully");
         setSession(null);
       }
     } catch (err) {
