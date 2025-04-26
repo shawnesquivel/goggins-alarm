@@ -25,6 +25,7 @@ export interface Project {
 export interface TimerSettings {
   focusDuration: number; // in minutes
   breakDuration: number; // in minutes
+  dailyGoal: number; // in minutes
   soundEnabled?: boolean;
   notificationsEnabled?: boolean;
 }

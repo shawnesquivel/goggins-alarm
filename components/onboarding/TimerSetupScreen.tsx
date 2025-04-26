@@ -36,7 +36,7 @@ export default function TimerSetupScreen({
 }: TimerSetupScreenProps) {
   const { settings, updateSettings } = usePomodoro();
   const [focusDuration, setFocusDuration] = useState(30);
-  const [breakDuration, setBreakDuration] = useState(0.0833);
+  const [breakDuration, setBreakDuration] = useState(5);
   const [fontsLoaded] = useFonts({
     LibreCaslonText_400Regular,
   });
@@ -59,7 +59,7 @@ export default function TimerSetupScreen({
   };
 
   const incrementBreak = () => {
-    setBreakDuration((prev) => Math.min(prev + 5, 30));
+    setBreakDuration((prev) => Math.min(prev + 5, 60));
   };
 
   const decrementBreak = () => {
@@ -96,7 +96,7 @@ export default function TimerSetupScreen({
     if (!isNaN(value)) {
       // Only apply min/max when the input is complete (reached max length)
       if (text.length === 2) {
-        setBreakDuration(Math.min(Math.max(value, 5), 30));
+        setBreakDuration(Math.min(Math.max(value, 5), 60));
       } else {
         // Allow any number while typing
         setBreakDuration(value);
@@ -143,6 +143,11 @@ export default function TimerSetupScreen({
                     selectTextOnFocus
                   />
                   <Text style={styles.timeUnit}>MINUTES</Text>
+                  {focusDuration >= 60 && (
+                    <Text style={styles.hoursText}>
+                      ({(focusDuration / 60).toFixed(1)} hrs)
+                    </Text>
+                  )}
                 </View>
 
                 <TouchableOpacity
@@ -261,5 +266,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#505050",
     marginTop: 4,
+  },
+  hoursText: {
+    fontSize: 14,
+    color: "#505050",
+    marginTop: 2,
   },
 });

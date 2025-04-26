@@ -278,11 +278,11 @@ export default function Auth({ isOnboardingFlow = false }) {
 
     return (
       <EmailForm {...formProps}>
-        <Text className="text-2xl font-bold text-center text-gray-800 mb-6">
-          {mode === "signin" ? "Welcome Back" : "Create Account"}
+        <Text className="text-xl font-bold text-center text-gray-800 mb-8">
+          {mode === "signin" ? "Sign In" : "Sign Up"}
         </Text>
 
-        <View className="mb-4">
+        <View className="mt-4 mb-4">
           <TextInput
             className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3 text-gray-800"
             placeholder="Email"
@@ -353,7 +353,7 @@ export default function Auth({ isOnboardingFlow = false }) {
 
       {/* Google Sign-In Button */}
       <TouchableOpacity
-        className="w-full max-w-md bg-white py-3 px-4 rounded-lg border border-gray-300 mb-8 flex-row items-center justify-center"
+        className="w-full max-w-md bg-white py-2 px-4 rounded-lg border border-gray-300 mb-4 flex-row items-center justify-center"
         onPress={signInWithGoogle}
       >
         <FontAwesome
@@ -367,8 +367,8 @@ export default function Auth({ isOnboardingFlow = false }) {
 
       {/* Go back to onboarding link */}
       <TouchableOpacity onPress={handleGoToOnboarding}>
-        <Text className="text-blue-500 text-center text-sm">
-          New to Deep Work? Start the tutorial again
+        <Text className="text-gray-500 text-center text-sm">
+          New here? Click to restart the tutorial.
         </Text>
       </TouchableOpacity>
     </View>

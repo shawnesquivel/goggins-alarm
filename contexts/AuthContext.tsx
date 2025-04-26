@@ -8,6 +8,8 @@ import React, {
 import { Session } from "@supabase/supabase-js";
 import { supabase, cleanupAppStateListener } from "../lib/supabase";
 import { Platform } from "react-native";
+import { ProjectService } from "@/services/ProjectService";
+import { AuthService } from "@/services/AuthService";
 
 type AuthContextType = {
   session: Session | null;
@@ -148,12 +150,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Sign out function
   const signOut = async () => {
     try {
-      console.log("[Auth] Signing out user...");
+      const userId = await AuthService.getCurrentUserId();
       const { error } = await supabase.auth.signOut();
+      if (userId) {
+        await ProjectService.clearUserData(userId);
+      }
+
       if (error) {
         console.error("[Auth] Error signing out:", error);
       } else {
-        console.log("[Auth] User signed out successfully");
         setSession(null);
       }
     } catch (err) {

@@ -72,18 +72,17 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
     description:
       "Every day, you'll aim to hit your goal (1-3hrs) and build a streak.\n\nOur AI will track your stats over time, and help unlock your *10X* productivity.",
   },
-  {
-    id: "trial",
-    type: OnboardingScreenType.TRIAL,
-    title: "Start your free trial",
-    description: "Free trial for 7 days, then $39.99/year ($3.33 per month)",
-    action: "Start 7-Day Trial",
-  },
+  // {
+  //   id: "trial",
+  //   type: OnboardingScreenType.TRIAL,
+  //   title: "Start your free trial",
+  //   description: "Pro Version\n\nAI insights\n\nCreate unlimited projects",
+  //   action: "Start 30-Day Free Trial",
+  // },
   {
     id: "login",
     type: OnboardingScreenType.LOGIN,
     title: "Sign in to your account",
-    description: "Create an account or sign in to continue",
   },
   {
     id: "setup2",
@@ -96,13 +95,7 @@ const ONBOARDING_SCREENS: OnboardingScreen[] = [
     type: OnboardingScreenType.SETUP,
     title: "Set your daily intention goal.",
     description:
-      "Most people fail because they push *too hard, too fast*.\n\n*Don't* be that person!\n\nSet a daily focus goal that you can commit to for the next 7 days, no matter what.\n\nWe highly recommend starting at 30-60min per day.\n\nYou can change this goal any time.",
-  },
-  {
-    id: "start",
-    type: OnboardingScreenType.START,
-    title: "Begin with *intention*.",
-    description: "Let's get started with your first focus session.",
+      "We highly recommend starting at 30-60min per day.\n\nYou can change any time.",
   },
 ];
 
